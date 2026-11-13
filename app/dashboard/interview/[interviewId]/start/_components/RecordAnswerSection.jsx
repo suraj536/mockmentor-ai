@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import React, { useContext, useEffect, useState, useRef } from "react";
 import Webcam from "react-webcam";
-import { Mic } from "lucide-react";
+import { Mic, Video, VideoOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";
 import { WebCamContext } from "@/app/dashboard/layout";
@@ -41,7 +41,7 @@ const RecordAnswerSection = ({
       };
 
       mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
         await transcribeAudio(audioBlob);
       };
 
@@ -49,7 +49,9 @@ const RecordAnswerSection = ({
       setIsRecording(true);
     } catch (error) {
       console.error("Error starting recording:", error);
-      toast("Error starting recording. Please check your microphone permissions.");
+      toast(
+        "Error starting recording. Please check your microphone permissions."
+      );
     }
   };
 
@@ -68,8 +70,8 @@ const RecordAnswerSection = ({
       reader.readAsDataURL(audioBlob);
       reader.onloadend = async () => {
         try {
-          const base64Audio = reader.result.split(',')[1];
-          
+          const base64Audio = reader.result.split(",")[1];
+
           const res = await fetch("/api/transcribe", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -167,37 +169,94 @@ const RecordAnswerSection = ({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center overflow-hidden">
-      <div className="flex flex-col justify-center items-center rounded-lg p-5 bg-black mt-4 w-[30rem] ">
+    <div className="flex flex-col items-center justify-between p-6 border border-border/60 rounded-xl bg-card shadow-sm h-full space-y-6">
+      {/* Video Viewport */}
+      <div className="w-full max-w-md aspect-video rounded-xl bg-muted/40 border border-border/60 overflow-hidden relative flex items-center justify-center">
         {webCamEnabled ? (
-          <Webcam
-            mirrored={true}
-            style={{ height: 250, width: "100%", zIndex: 10 }}
-          />
+          <>
+            <Webcam
+              mirrored={true}
+              className="w-full h-full object-cover"
+              style={{ height: "100%", width: "100%", zIndex: 10 }}
+            />
+            <div className="absolute top-3 left-3 px-2 py-1 rounded-md bg-black/60 backdrop-blur-sm text-white text-xs flex items-center gap-1.5 z-20">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              Live
+            </div>
+          </>
         ) : (
-          <Image src={"/camera.jpg"} width={200} height={200} alt="Camera placeholder" />
+          <div className="flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
+            <Image
+              src="/camera.jpg"
+              width={140}
+              height={140}
+              alt="Camera placeholder"
+              className="rounded-lg opacity-80"
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              Camera is currently off
+            </p>
+          </div>
+        )}
+
+        {isRecording && (
+          <div className="absolute top-3 right-3 px-2.5 py-1 rounded-md bg-rose-500/90 backdrop-blur-sm text-white text-xs font-medium flex items-center gap-1.5 z-20 animate-pulse">
+            <span className="h-2 w-2 rounded-full bg-white" />
+            Recording
+          </div>
         )}
       </div>
-      <div className="md:flex mt-4 md:mt-8 md:gap-5">
-        <div className="my-4 md:my-0">
-          <Button onClick={() => setWebCamEnabled((prev) => !prev)}>
-            {webCamEnabled ? "Close WebCam" : "Enable WebCam"}
-          </Button>
-        </div>
+
+      {/* Controls */}
+      <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
         <Button
+          type="button"
           variant="outline"
+          onClick={() => setWebCamEnabled((prev) => !prev)}
+          className="w-full sm:w-auto gap-2"
+        >
+          {webCamEnabled ? (
+            <>
+              <VideoOff className="h-4 w-4" />
+              Close WebCam
+            </>
+          ) : (
+            <>
+              <Video className="h-4 w-4" />
+              Enable WebCam
+            </>
+          )}
+        </Button>
+
+        <Button
+          type="button"
+          variant={isRecording ? "destructive" : "default"}
           onClick={isRecording ? stopRecording : startRecording}
           disabled={loading}
+          className="w-full sm:w-auto gap-2 min-w-[160px]"
         >
-          {isRecording ? (
-            <h2 className="text-red-400 flex gap-2 ">
-              <Mic /> Stop Recording...
-            </h2>
+          {loading ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Saving response...
+            </span>
+          ) : isRecording ? (
+            <span className="flex items-center gap-2">
+              <Mic className="h-4 w-4 animate-pulse text-white" />
+              Stop Recording...
+            </span>
           ) : (
-            " Record Answer"
+            <span className="flex items-center gap-2">
+              <Mic className="h-4 w-4" />
+              Record Answer
+            </span>
           )}
         </Button>
       </div>
+
+      <p className="text-xs text-center text-muted-foreground max-w-sm">
+        Click Record Answer and speak clearly. Click Stop Recording when finished to submit.
+      </p>
     </div>
   );
 };
