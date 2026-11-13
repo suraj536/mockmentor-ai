@@ -25,6 +25,7 @@ const AddNewInterview = () => {
   const [jobExperience, setJobExperience] = useState();
   const [loading, setLoading] = useState(false);
   const [jsonResponse, setJsonResponse] = useState([]);
+  const [interviewType, setInterviewType] = useState("technical");
   const { user } = useUser();
   const router = useRouter();
 
@@ -41,6 +42,7 @@ const AddNewInterview = () => {
           jobPosition,
           jobDesc,
           jobExperience,
+          type: interviewType,
         }),
       });
 
@@ -87,6 +89,7 @@ const AddNewInterview = () => {
         const resp = await dbRes.json();
 
         if (resp) {
+          setInterviewType("technical");
           setOpenDialog(false);
           router.push("/dashboard/interview/" + resp[0]?.mockId);
         }
@@ -118,7 +121,13 @@ const AddNewInterview = () => {
           </div>
         </div>
       </div>
-      <Dialog open={openDialog}>
+      <Dialog
+        open={openDialog}
+        onOpenChange={(open) => {
+          setOpenDialog(open);
+          if (!open) setInterviewType("technical");
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl text-foreground">
@@ -131,6 +140,33 @@ const AddNewInterview = () => {
                     Add Details about your job position, job description and
                     years of experience
                   </h2>
+
+                  {/* Interview Type Selector */}
+                  <div className="mt-7 my-3">
+                    <label className="text-sm font-medium text-foreground">
+                      Interview Type
+                    </label>
+                    <div className="flex gap-2 mt-1">
+                      <Button
+                        type="button"
+                        variant={interviewType === "technical" ? "default" : "outline"}
+                        aria-pressed={interviewType === "technical"}
+                        onClick={() => setInterviewType("technical")}
+                        className="flex-1"
+                      >
+                        Technical
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={interviewType === "behavioral" ? "default" : "outline"}
+                        aria-pressed={interviewType === "behavioral"}
+                        onClick={() => setInterviewType("behavioral")}
+                        className="flex-1"
+                      >
+                        Behavioral (STAR)
+                      </Button>
+                    </div>
+                  </div>
 
                   <div className="mt-7 my-3">
                     <label className="text-sm font-medium text-foreground">Job Role/job Position</label>
@@ -168,7 +204,10 @@ const AddNewInterview = () => {
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => setOpenDialog(false)}
+                    onClick={() => {
+                      setInterviewType("technical");
+                      setOpenDialog(false);
+                    }}
                   >
                     Cancel
                   </Button>

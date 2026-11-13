@@ -12,6 +12,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import { formatExperience } from "@/lib/utils";
 
+// Parses the STAR sentinel line prepended by evaluate/route.js for behavioral answers.
+// Returns { star: { S, T, A, R }, text } when found, or { star: null, text } otherwise.
+function parseStarFeedback(feedbackText) {
+  const match = feedbackText?.match(
+    /^STAR:S=(\d+),T=(\d+),A=(\d+),R=(\d+)\n([\s\S]*)$/
+  );
+  if (!match) return { star: null, text: feedbackText ?? "" };
+  return {
+    star: { S: +match[1], T: +match[2], A: +match[3], R: +match[4] },
+    text: match[5],
+  };
+}
+
 const Feedback = ({ params }) => {
   const router = useRouter();
   const [feedbackList, setFeedbackList] = useState([]);
@@ -271,68 +284,100 @@ const Feedback = ({ params }) => {
               Question Breakdown
             </h2>
 
-            {feedbackList.map((item, index) => (
-              <Collapsible
-                key={index}
-                className="feedback-question-card border border-border/60 rounded-xl bg-card shadow-sm overflow-hidden"
-              >
-                <CollapsibleTrigger className="p-4 sm:p-5 w-full flex items-center justify-between gap-4 text-left hover:bg-muted/40 transition-colors cursor-pointer print:cursor-default print:hover:bg-transparent">
-                  <div className="flex items-center gap-3">
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary shrink-0">
-                      Q{index + 1}
-                    </span>
-                    <span className="font-semibold text-sm sm:text-base text-foreground">
-                      {item.question}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-md text-xs font-semibold ${
-                        Number(item.rating) >= 7.5
-                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                          : Number(item.rating) >= 5
-                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                          : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-                      }`}
-                    >
-                      {item.rating}/10
-                    </span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 print:hidden" />
-                  </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="feedback-question-content p-4 sm:p-5 pt-0 space-y-3 border-t border-border/40 mt-1">
-                  {/* Your Answer */}
-                  <div className="rounded-lg p-3.5 bg-muted/40 border border-border/40 space-y-1">
-                    <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">
-                      Your Answer
-                    </span>
-                    <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                      {item.userAns || "No answer recorded."}
-                    </p>
-                  </div>
+            {feedbackList.map((item, index) => {
+              const parsed = parseStarFeedback(item.feedback);
+              return (
+                <Collapsible
+                  key={index}
+                  className="feedback-question-card border border-border/60 rounded-xl bg-card shadow-sm overflow-hidden"
+                >
+                  <CollapsibleTrigger className="p-4 sm:p-5 w-full flex items-center justify-between gap-4 text-left hover:bg-muted/40 transition-colors cursor-pointer print:cursor-default print:hover:bg-transparent">
+                    <div className="flex items-center gap-3">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary shrink-0">
+                        Q{index + 1}
+                      </span>
+                      <span className="font-semibold text-sm sm:text-base text-foreground">
+                        {item.question}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span
+                        className={`px-2.5 py-0.5 rounded-md text-xs font-semibold ${
+                          Number(item.rating) >= 7.5
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                            : Number(item.rating) >= 5
+                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                            : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                        }`}
+                      >
+                        {item.rating}/10
+                      </span>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 print:hidden" />
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="feedback-question-content p-4 sm:p-5 pt-0 space-y-3 border-t border-border/40 mt-1">
+                    {/* Your Answer */}
+                    <div className="rounded-lg p-3.5 bg-muted/40 border border-border/40 space-y-1">
+                      <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">
+                        Your Answer
+                      </span>
+                      <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                        {item.userAns || "No answer recorded."}
+                      </p>
+                    </div>
 
-                  {/* Ideal Answer */}
-                  <div className="rounded-lg p-3.5 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 space-y-1">
-                    <span className="text-xs uppercase tracking-wider font-semibold text-emerald-600 dark:text-emerald-400">
-                      Ideal Answer
-                    </span>
-                    <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
-                      {item.correctAns}
-                    </p>
-                  </div>
+                    {/* Ideal Answer */}
+                    <div className="rounded-lg p-3.5 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 space-y-1">
+                      <span className="text-xs uppercase tracking-wider font-semibold text-emerald-600 dark:text-emerald-400">
+                        Ideal Answer
+                      </span>
+                      <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
+                        {item.correctAns}
+                      </p>
+                    </div>
 
-                  {/* Feedback */}
-                  <div className="rounded-lg p-3.5 bg-primary/5 dark:bg-primary/10 border border-primary/20 space-y-1">
-                    <span className="text-xs uppercase tracking-wider font-semibold text-primary">
-                      Feedback
-                    </span>
-                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                      {item.feedback}
-                    </p>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
+                    {/* Feedback */}
+                    <div className="rounded-lg p-3.5 bg-primary/5 dark:bg-primary/10 border border-primary/20 space-y-1">
+                      {parsed.star ? (
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-xs uppercase tracking-wider font-semibold text-primary">
+                              Feedback
+                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground border border-border/60">
+                                Situation {parsed.star.S}/10
+                              </span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground border border-border/60">
+                                Task {parsed.star.T}/10
+                              </span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground border border-border/60">
+                                Action {parsed.star.A}/10
+                              </span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground border border-border/60">
+                                Result {parsed.star.R}/10
+                              </span>
+                            </div>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                            {parsed.text}
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-xs uppercase tracking-wider font-semibold text-primary">
+                            Feedback
+                          </span>
+                          <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                            {item.feedback}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
           </div>
 
           {/* Print-only footer — hidden on screen */}

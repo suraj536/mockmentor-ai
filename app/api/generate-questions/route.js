@@ -39,8 +39,12 @@ export async function POST(req) {
     }
 
     const body = await req.json();
-    const { mode, jobPosition, jobDesc, jobExperience, typeQuestion, company } =
+    const { mode, jobPosition, jobDesc, jobExperience, typeQuestion, company, type } =
       body;
+
+    // Validate interview type — only applied when mode is "interview"
+    const interviewType =
+      mode === "interview" && type === "behavioral" ? "behavioral" : "technical";
 
     const userEmail = await getUserEmail();
     if (userEmail) {
@@ -107,6 +111,15 @@ export async function POST(req) {
     Each question and answer should be fields in the JSON. Ensure "Question" and "Answer" are fields.
 }  
   `;
+    } else if (interviewType === "behavioral") {
+      InputPrompt = `Job Position: ${jobPosition}
+Job Description: ${jobDesc}
+Years of Experience: ${jobExperience}
+Generate exactly 5 behavioral interview questions appropriate for this role and experience level.
+Each question must start with "Tell me about a time..." or use similar behavioral phrasing.
+For each question, provide a model STAR answer covering Situation, Task, Action, and Result.
+Return a JSON array where every element has exactly two string fields: "Question" and "Answer".
+Return only the JSON array, no extra text.`;
     } else {
       InputPrompt = `
   Job Positions: ${jobPosition}, 
@@ -131,10 +144,58 @@ export async function POST(req) {
 
     const result = await model.generateContent(InputPrompt);
     const rawText = result.response.text();
-    const MockJsonResp = rawText
+    let MockJsonResp = rawText
       .replace("```json", "")
       .replace("```", "")
       .trim();
+
+    // For interview mode: validate, normalize to array, and inject Type field
+    if (mode === "interview") {
+      let parsed;
+      try {
+        parsed = JSON.parse(MockJsonResp);
+      } catch (_) {
+        return NextResponse.json(
+          { error: "Failed to generate questions" },
+          { status: 500 }
+        );
+      }
+
+      // Normalize: if not an array, accept an object with an array property (e.g. "questions")
+      if (!Array.isArray(parsed)) {
+        const arrayVal =
+          parsed && typeof parsed === "object"
+            ? Object.values(parsed).find((v) => Array.isArray(v))
+            : null;
+        if (arrayVal) {
+          parsed = arrayVal;
+        } else {
+          return NextResponse.json(
+            { error: "Failed to generate questions" },
+            { status: 500 }
+          );
+        }
+      }
+
+      // Filter out non-objects and inject Type
+      const questions = parsed
+        .filter(
+          (item) =>
+            item !== null &&
+            typeof item === "object" &&
+            !Array.isArray(item)
+        )
+        .map((item) => ({ ...item, Type: interviewType }));
+
+      if (questions.length === 0) {
+        return NextResponse.json(
+          { error: "Failed to generate questions" },
+          { status: 500 }
+        );
+      }
+
+      MockJsonResp = JSON.stringify(questions);
+    }
 
     return NextResponse.json({ jsonResponse: MockJsonResp });
   } catch (error) {

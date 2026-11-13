@@ -119,6 +119,7 @@ const RecordAnswerSection = ({
         body: JSON.stringify({
           question: mockInterviewQuestion[activeQuestionIndex]?.Question,
           userAnswer: userAnswer,
+          type: mockInterviewQuestion[activeQuestionIndex]?.Type ?? "technical",
         }),
       });
 
