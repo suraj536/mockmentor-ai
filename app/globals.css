@@ -74,3 +74,83 @@
       @apply bg-background text-foreground;
     }
   }
+
+@media print {
+  /* ── 1. Hide dashboard chrome ───────────────────────────────────────── */
+  header {
+    display: none !important;
+  }
+
+  /* ── 2. Remove side margins added by layout.jsx ─────────────────────── */
+  /* targets the mx-5 / md:mx-20 / lg:mx-36 wrapper */
+  body > div > div {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /* ── 3. Force white background + dark text; override dark-mode vars ─── */
+  html,
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+    color-scheme: light !important;
+  }
+
+  /* Reset every CSS variable to its light-mode value so shadcn tokens
+     render correctly even when the .dark class is active on <html>. */
+  :root,
+  .dark {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+  }
+
+  /* ── 4. Preserve colors for badges, gauges, and tinted backgrounds ─── */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* ── 5. Expand all Collapsible question cards ───────────────────────── */
+  /* Radix CollapsibleContent sets height:0 + overflow:hidden via inline
+     style and data-state="closed". Override both so all cards print open. */
+  .feedback-question-content,
+  .feedback-question-content[data-state="closed"],
+  .feedback-question-content[data-state="open"] {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  /* ── 6. Keep each question card on one page where possible ──────────── */
+  .feedback-question-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 1rem;
+  }
+
+  /* ── 7. Remove decorative shadows for a cleaner print ───────────────── */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
