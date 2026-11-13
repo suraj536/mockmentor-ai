@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, PlusCircle } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -101,27 +101,39 @@ const AddNewInterview = () => {
   return (
     <div>
       <div
-        className="p-10 rounded-lg border bg-secondary hover:scale-105 hover:shadow-sm transition-all cursor-pointer"
+        className="group relative overflow-hidden rounded-xl border border-dashed border-border bg-card p-6 sm:p-8 hover:border-primary/60 hover:bg-muted/20 transition-all duration-300 cursor-pointer shadow-sm"
         onClick={() => setOpenDialog(true)}
       >
-        <h2 className=" text-lg text-center">+ Add New</h2>
+        <div className="flex items-center gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:scale-105 transition-transform duration-300">
+            <PlusCircle className="h-6 w-6" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
+              + Start New Mock Interview
+            </h3>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+              Practice role-specific interview questions with instant AI audio evaluation.
+            </p>
+          </div>
+        </div>
       </div>
       <Dialog open={openDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl">
+            <DialogTitle className="text-2xl text-foreground">
               Tell us more about your job interviewing
             </DialogTitle>
             <DialogDescription>
               <form onSubmit={onSubmit}>
                 <div className="my-3">
-                  <h2>
+                  <h2 className="text-muted-foreground text-sm">
                     Add Details about your job position, job description and
                     years of experience
                   </h2>
 
                   <div className="mt-7 my-3">
-                    <label className="text-black">Job Role/job Position</label>
+                    <label className="text-sm font-medium text-foreground">Job Role/job Position</label>
                     <Input
                       className="mt-1"
                       placeholder="Ex. Full stack Developer"
@@ -130,18 +142,18 @@ const AddNewInterview = () => {
                     />
                   </div>
                   <div className="my-5">
-                    <label className="text-black">
+                    <label className="text-sm font-medium text-foreground">
                       Job Description(In Short)
                     </label>
                     <Textarea
-                      className="placeholder-opacity-50"
+                      className="placeholder-opacity-50 mt-1"
                       placeholder="Ex. React, Angular, Nodejs, Mysql, Nosql, Python"
                       required
                       onChange={(e) => setJobDesc(e.target.value)}
                     />
                   </div>
                   <div className="my-5">
-                    <label className="text-black">Years of Experience</label>
+                    <label className="text-sm font-medium text-foreground">Years of Experience</label>
                     <Input
                       className="mt-1"
                       placeholder="Ex. 5"
