@@ -43,6 +43,14 @@ export async function POST(req, { params }) {
     const correctAnsStr = typeof correctAns === "string" ? correctAns : "";
     const feedbackStr = typeof feedback === "string" ? feedback : "";
 
+    let parsedRating = null;
+    if (rating !== undefined && rating !== null) {
+      const parsed = typeof rating === "number" ? rating : parseFloat(String(rating).trim());
+      if (typeof parsed === "number" && isFinite(parsed)) {
+        parsedRating = Math.min(10, Math.max(0, Math.round(parsed)));
+      }
+    }
+
     if (
       !isValidString(question, 2000) ||
       !isValidString(userAns, 20000) ||
@@ -59,7 +67,7 @@ export async function POST(req, { params }) {
       correctAns: correctAnsStr,
       userAns,
       feedback: feedbackStr,
-      rating: ratingStr,
+      rating: parsedRating,
       userEmail,
       createdAt: moment().format("YYYY-MM-DD"),
     });

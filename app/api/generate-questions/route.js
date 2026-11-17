@@ -11,7 +11,7 @@ import {
 import { getUserEmail } from "@/lib/getUserEmail";
 import { db } from "@/utils/db";
 import { MockInterview, Question } from "@/utils/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import moment from "moment";
 
 export async function POST(req) {
@@ -61,7 +61,7 @@ export async function POST(req) {
           .where(
             and(
               eq(Question.createdBy, userEmail),
-              eq(Question.createdAt, today)
+              sql`DATE(${Question.createdAt}) = ${today}::date`
             )
           );
         if (existing.length >= DAILY_QUESTIONS_CAP) {
@@ -82,7 +82,7 @@ export async function POST(req) {
           .where(
             and(
               eq(MockInterview.createdBy, userEmail),
-              eq(MockInterview.createdAt, today)
+              sql`DATE(${MockInterview.createdAt}) = ${today}::date`
             )
           );
         if (existing.length >= DAILY_INTERVIEWS_CAP) {

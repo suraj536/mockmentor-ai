@@ -1,4 +1,4 @@
-import { serial, text, varchar } from "drizzle-orm/pg-core";
+import { integer, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 import { pgTable } from "drizzle-orm/pg-core";
 
 export const MockInterview = pgTable('mockInterview', {
@@ -8,7 +8,7 @@ export const MockInterview = pgTable('mockInterview', {
     jobDesc: varchar('jobDesc').notNull(),
     jobExperience: varchar('jobExperience').notNull(),
     createdBy: varchar('createdBy').notNull(),
-    createdAt: varchar('createdAt'),
+    createdAt: timestamp('createdAt', { mode: 'string' }),
     mockId: varchar('mockId').notNull()
 });
 
@@ -21,7 +21,7 @@ export const Question = pgTable('question', {
     typeQuestion: varchar('typeQuestion').notNull(),
     company: varchar('company').notNull(),
     createdBy: varchar('createdBy').notNull(),
-    createdAt: varchar('createdAt'),
+    createdAt: timestamp('createdAt', { mode: 'string' }),
     mockId: varchar('mockId').notNull()
 });
 
@@ -34,9 +34,9 @@ export const UserAnswer = pgTable('userAnswer',{
     correctAns: text('correctAns'),
     userAns: text('userAns'),
     feedback: text('feedback'),
-    rating: varchar('rating'),
+    rating: integer('rating'),
     userEmail: varchar('userEmail'),
-    createdAt: varchar('createdAt')
+    createdAt: timestamp('createdAt', { mode: 'string' })
 })
 
 export const Newsletter = pgTable('newsletter',{
@@ -44,5 +44,5 @@ export const Newsletter = pgTable('newsletter',{
     newName: varchar('newName'),
     newEmail: varchar('newEmail'),
     newMessage: text('newMessage'),
-    createdAt: varchar('createdAt')
+    createdAt: timestamp('createdAt', { mode: 'string' })
 })

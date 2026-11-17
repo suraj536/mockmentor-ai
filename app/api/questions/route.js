@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getUserEmail } from "@/lib/getUserEmail";
 import { db } from "@/utils/db";
 import { Question } from "@/utils/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import moment from "moment";
 import { DAILY_QUESTIONS_CAP } from "@/lib/limits";
@@ -47,7 +47,7 @@ export async function POST(req) {
       .where(
         and(
           eq(Question.createdBy, userEmail),
-          eq(Question.createdAt, today)
+          sql`DATE(${Question.createdAt}) = ${today}::date`
         )
       );
 

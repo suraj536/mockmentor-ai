@@ -128,8 +128,20 @@ Respond with valid JSON only, using exactly these fields:
       throw new Error("Invalid JSON response: " + MockJsonResp);
     }
 
+    let finalRating = "";
+    const rawRating = jsonFeedbackResp?.rating;
+    if (rawRating !== undefined && rawRating !== null) {
+      const parsed =
+        typeof rawRating === "number"
+          ? rawRating
+          : parseFloat(String(rawRating).trim());
+      if (typeof parsed === "number" && isFinite(parsed)) {
+        finalRating = String(Math.min(10, Math.max(0, Math.round(parsed))));
+      }
+    }
+
     return NextResponse.json({
-      rating: String(jsonFeedbackResp?.rating ?? ""),
+      rating: finalRating,
       feedback: jsonFeedbackResp?.feedback ?? "",
     });
   } catch (error) {
