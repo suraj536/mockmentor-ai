@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import React, { useContext, useEffect, useState, useRef } from "react";
 import Webcam from "react-webcam";
-import { Mic, Video, VideoOff, Loader2 } from "lucide-react";
+import { Mic, Video, VideoOff, Loader2, Check, RotateCcw, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";
 import { WebCamContext } from "@/app/dashboard/layout";
@@ -17,6 +17,12 @@ const RecordAnswerSection = ({
   setFollowUpQuestion,
   followUpRowId,
   setFollowUpRowId,
+  isHandsFreeRunning = false,
+  handsFreeStatus = "DISABLED",
+  handsFreeMessage = "",
+  levelMeterRef = null,
+  onFinishNow = null,
+  onRepeatQuestion = null,
 }) => {
   const [userAnswer, setUserAnswer] = useState("");
   const { user } = useUser();
@@ -386,57 +392,143 @@ const RecordAnswerSection = ({
       </div>
 
       {/* Controls */}
-      <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setWebCamEnabled((prev) => !prev)}
-          className="w-full sm:w-auto gap-2"
-        >
-          {webCamEnabled ? (
-            <>
-              <VideoOff className="h-4 w-4" />
-              Close WebCam
-            </>
-          ) : (
-            <>
-              <Video className="h-4 w-4" />
-              Enable WebCam
-            </>
-          )}
-        </Button>
+      {isHandsFreeRunning ? (
+        <div className="w-full flex flex-col items-center gap-3 pt-2">
+          <div
+            role="status"
+            aria-live="polite"
+            className="w-full text-center p-3.5 rounded-xl border border-primary/20 bg-primary/5 dark:bg-primary/10 flex flex-col items-center gap-2"
+          >
+            <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-foreground">
+              {handsFreeStatus.startsWith("SPEAKING") && (
+                <Volume2 className="h-4 w-4 text-primary animate-pulse motion-reduce:animate-none" />
+              )}
+              {handsFreeStatus.startsWith("LISTENING") && (
+                <span className="flex h-2.5 w-2.5 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75 motion-reduce:animate-none" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
+                </span>
+              )}
+              {handsFreeStatus.startsWith("PROCESSING") && (
+                <Loader2 className="h-4 w-4 text-primary animate-spin motion-reduce:animate-none" />
+              )}
+              <span>{handsFreeMessage}</span>
+            </div>
 
-        <Button
-          type="button"
-          variant={isRecording ? "destructive" : "default"}
-          onClick={isRecording ? stopRecording : startRecording}
-          disabled={loading}
-          className="w-full sm:w-auto gap-2 min-w-[160px]"
-        >
-          {loading ? (
-            <span className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              {mode === "followup" ? "Saving follow-up..." : "Saving response..."}
-            </span>
-          ) : isRecording ? (
-            <span className="flex items-center gap-2">
-              <Mic className="h-4 w-4 animate-pulse text-white" />
-              Stop Recording...
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              <Mic className="h-4 w-4" />
-              {mode === "followup" ? "Record Follow-up Answer" : "Record Answer"}
-            </span>
-          )}
-        </Button>
-      </div>
+            {handsFreeStatus.startsWith("LISTENING") && (
+              <div className="w-full max-w-[220px] flex items-center gap-2 mt-1">
+                <span className="text-[11px] text-muted-foreground shrink-0">Voice Level</span>
+                <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden border border-border/40">
+                  <div
+                    ref={levelMeterRef}
+                    className="h-full bg-emerald-500 rounded-full transition-all duration-75"
+                    style={{ width: "0%" }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
 
-      <p className="text-xs text-center text-muted-foreground max-w-sm">
-        {mode === "followup"
-          ? "Click Record Follow-up Answer to respond, or click Skip follow-up on the left."
-          : "Click Record Answer and speak clearly. Click Stop Recording when finished to submit."}
-      </p>
+          {handsFreeStatus.startsWith("LISTENING") && (
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={onFinishNow}
+                className="gap-1.5 text-xs h-8"
+              >
+                <Check className="h-3.5 w-3.5 text-emerald-500" />
+                I'm done
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onRepeatQuestion}
+                className="gap-1.5 text-xs h-8"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Repeat question
+              </Button>
+            </div>
+          )}
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setWebCamEnabled((prev) => !prev)}
+            className="text-xs text-muted-foreground gap-1.5"
+          >
+            {webCamEnabled ? (
+              <>
+                <VideoOff className="h-3.5 w-3.5" />
+                Close WebCam
+              </>
+            ) : (
+              <>
+                <Video className="h-3.5 w-3.5" />
+                Enable WebCam
+              </>
+            )}
+          </Button>
+        </div>
+      ) : (
+        <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setWebCamEnabled((prev) => !prev)}
+            className="w-full sm:w-auto gap-2"
+          >
+            {webCamEnabled ? (
+              <>
+                <VideoOff className="h-4 w-4" />
+                Close WebCam
+              </>
+            ) : (
+              <>
+                <Video className="h-4 w-4" />
+                Enable WebCam
+              </>
+            )}
+          </Button>
+
+          <Button
+            type="button"
+            variant={isRecording ? "destructive" : "default"}
+            onClick={isRecording ? stopRecording : startRecording}
+            disabled={loading}
+            className="w-full sm:w-auto gap-2 min-w-[160px]"
+          >
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {mode === "followup" ? "Saving follow-up..." : "Saving response..."}
+              </span>
+            ) : isRecording ? (
+              <span className="flex items-center gap-2">
+                <Mic className="h-4 w-4 animate-pulse text-white" />
+                Stop Recording...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Mic className="h-4 w-4" />
+                {mode === "followup" ? "Record Follow-up Answer" : "Record Answer"}
+              </span>
+            )}
+          </Button>
+        </div>
+      )}
+
+      {!isHandsFreeRunning && (
+        <p className="text-xs text-center text-muted-foreground max-w-sm">
+          {mode === "followup"
+            ? "Click Record Follow-up Answer to respond, or click Skip follow-up on the left."
+            : "Click Record Answer and speak clearly. Click Stop Recording when finished to submit."}
+        </p>
+      )}
     </div>
   );
 };

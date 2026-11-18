@@ -11,12 +11,15 @@ const QuestionSection = ({
   setActiveQuestionIndex,
   followUpQuestion,
   onSkipFollowUp,
+  isHandsFreeActive = false,
+  speechHook = null,
 }) => {
   const [hasMounted, setHasMounted] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [voiceSpeed, setVoiceSpeed] = useState(1);
 
-  const { isSupported, isSpeaking, isBlocked, speak, cancel } = useSpeech();
+  const localSpeech = useSpeech();
+  const { isSupported, isSpeaking, isBlocked, speak, cancel } = speechHook || localSpeech;
 
   // Load saved preferences safely after mount
   useEffect(() => {
@@ -49,7 +52,13 @@ const QuestionSection = ({
 
   // Auto-read effect: depends only on question text/index and voiceEnabled (NOT on speed)
   useEffect(() => {
-    if (!hasMounted || !isSupported || !voiceEnabled || !currentQuestionText) {
+    if (
+      !hasMounted ||
+      !isSupported ||
+      !voiceEnabled ||
+      !currentQuestionText ||
+      isHandsFreeActive
+    ) {
       return;
     }
 
@@ -66,11 +75,18 @@ const QuestionSection = ({
     isSupported,
     speak,
     cancel,
+    isHandsFreeActive,
   ]);
 
   // Auto-read follow-up question when it appears
   useEffect(() => {
-    if (!hasMounted || !isSupported || !voiceEnabled || !followUpQuestion) {
+    if (
+      !hasMounted ||
+      !isSupported ||
+      !voiceEnabled ||
+      !followUpQuestion ||
+      isHandsFreeActive
+    ) {
       return;
     }
 
@@ -87,6 +103,7 @@ const QuestionSection = ({
     isSupported,
     speak,
     cancel,
+    isHandsFreeActive,
   ]);
 
   const toggleVoice = () => {
