@@ -190,9 +190,10 @@ export async function GET() {
     for (const item of interviews) {
       // Determine interview type from stored jsonMockResp
       let interviewType = "technical";
+      let questionsList = [];
       try {
         const parsed = JSON.parse(item.jsonMockResp);
-        const questionsList = Array.isArray(parsed)
+        questionsList = Array.isArray(parsed)
           ? parsed
           : parsed && typeof parsed === "object"
           ? Object.values(parsed).find((v) => Array.isArray(v)) || []
@@ -204,6 +205,14 @@ export async function GET() {
         interviewType = "technical";
       }
 
+      // Build question type lookup map for this interview by normalized question key
+      const questionTypeMap = new Map();
+      for (const q of questionsList) {
+        if (q?.Question) {
+          questionTypeMap.set(normalizeQuestionKey(q.Question), q?.Type);
+        }
+      }
+
       const interviewGroup = answersByMockId.get(item.mockId);
       const answersList = interviewGroup
         ? interviewGroup.order.map((key) => interviewGroup.map.get(key))
@@ -211,6 +220,30 @@ export async function GET() {
       const validRatings = [];
 
       for (const ans of answersList) {
+        // Classify each answer by its own question's Type:
+        // 1. matched from that interview's jsonMockResp via normalizeQuestionKey
+        // 2. fallback to STAR: sentinel in feedback
+        // 3. fallback to technical
+        let answerType = null;
+        const normKey = normalizeQuestionKey(ans.question);
+        const matchedType = questionTypeMap.get(normKey);
+        if (matchedType) {
+          answerType =
+            String(matchedType).toLowerCase() === "behavioral"
+              ? "behavioral"
+              : "technical";
+        }
+
+        if (!answerType) {
+          if (typeof ans.feedback === "string" && ans.feedback.startsWith("STAR:")) {
+            answerType = "behavioral";
+          }
+        }
+
+        if (!answerType) {
+          answerType = "technical";
+        }
+
         if (ans.rating !== null && ans.rating !== undefined) {
           const num = Number(ans.rating);
           if (isFinite(num)) {
@@ -218,7 +251,7 @@ export async function GET() {
             allValidRatingsSum += num;
             allValidRatingsCount += 1;
 
-            if (interviewType === "behavioral") {
+            if (answerType === "behavioral") {
               behRatingsSum += num;
               behRatingsCount += 1;
             } else {
@@ -228,8 +261,8 @@ export async function GET() {
           }
         }
 
-        // Check for STAR feedback in behavioral answers
-        if (interviewType === "behavioral" && ans.feedback) {
+        // Check for STAR feedback in behavioral answers using answerType
+        if (answerType === "behavioral" && ans.feedback) {
           const parsedStar = parseStarFeedback(ans.feedback);
           if (parsedStar.star) {
             starSumS += parsedStar.star.S;

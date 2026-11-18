@@ -19,6 +19,7 @@ const InterviewItemCard = ({ interview, onDelete }) => {
 
   const isBehavioral = (interview?.type || "").toLowerCase() === "behavioral";
   const hasScore = typeof interview?.averageScore === "number" && !isNaN(interview?.averageScore);
+  const isPractice = (interview?.jobPosition || "").startsWith("Practice:");
 
   return (
     <Card className="flex flex-col justify-between border-border/60 bg-card hover:border-border transition-all duration-200 shadow-sm">
@@ -26,6 +27,11 @@ const InterviewItemCard = ({ interview, onDelete }) => {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1 space-y-1">
             <div className="flex items-center gap-1.5 flex-wrap">
+              {isPractice && (
+                <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                  Practice
+                </span>
+              )}
               <span
                 className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium border ${
                   isBehavioral

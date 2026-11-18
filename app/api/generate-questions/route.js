@@ -191,7 +191,8 @@ export async function POST(req) {
           .where(
             and(
               eq(MockInterview.createdBy, userEmail),
-              sql`DATE(${MockInterview.createdAt}) = ${today}::date`
+              sql`DATE(${MockInterview.createdAt}) = ${today}::date`,
+              sql`${MockInterview.jobPosition} NOT LIKE 'Practice:%'`
             )
           );
         if (existing.length >= DAILY_INTERVIEWS_CAP) {

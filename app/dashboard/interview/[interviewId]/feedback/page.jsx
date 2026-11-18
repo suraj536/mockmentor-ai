@@ -14,7 +14,9 @@ import {
   Check,
   RotateCcw,
   Lightbulb,
+  Target,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   Collapsible,
   CollapsibleContent,
@@ -115,6 +117,37 @@ const Feedback = ({ params }) => {
   const [coachingErrors, setCoachingErrors] = useState({});
   const [coachingCollapsed, setCoachingCollapsed] = useState({});
   const [copiedAnswerId, setCopiedAnswerId] = useState(null);
+  const [isStartingPractice, setIsStartingPractice] = useState(false);
+
+  const weakCount = useMemo(() => {
+    return feedbackList.filter((item) => {
+      if (item.rating === null || item.rating === undefined) return false;
+      const num = Number(item.rating);
+      return !isNaN(num) && num <= 6;
+    }).length;
+  }, [feedbackList]);
+
+  const handleStartPractice = async () => {
+    if (isStartingPractice || weakCount === 0) return;
+    setIsStartingPractice(true);
+    try {
+      const res = await fetch("/api/practice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mockId: params.interviewId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to create practice session.");
+      }
+      if (data?.mockId) {
+        router.push(`/dashboard/interview/${data.mockId}`);
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to start practice session.");
+      setIsStartingPractice(false);
+    }
+  };
 
   useEffect(() => {
     GetFeedback();
@@ -827,6 +860,27 @@ const Feedback = ({ params }) => {
               <Download className="h-4 w-4" />
               Download PDF Report
             </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={handleStartPractice}
+                disabled={weakCount === 0 || isStartingPractice}
+                className="gap-2 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
+                aria-label={`Practice weak questions (${weakCount})`}
+              >
+                {isStartingPractice ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin text-amber-500" />
+                ) : (
+                  <Target className="h-4 w-4 text-amber-500" />
+                )}
+                Practice weak questions ({weakCount})
+              </Button>
+              {weakCount === 0 && (
+                <span className="text-xs text-muted-foreground">
+                  (All answers scored &gt; 6/10)
+                </span>
+              )}
+            </div>
           </div>
         </>
       )}
