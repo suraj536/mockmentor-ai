@@ -20,6 +20,7 @@ import ScoreTrendChart from "./_components/ScoreTrendChart";
 import CategoryBreakdown from "./_components/CategoryBreakdown";
 import StarSection from "./_components/StarSection";
 import RecentInterviewsTable from "./_components/RecentInterviewsTable";
+import StreakWidget from "../_components/StreakWidget";
 
 const ProgressPage = () => {
   const router = useRouter();
@@ -189,6 +190,9 @@ const ProgressPage = () => {
       {/* Active Content State */}
       {!loading && !error && data && data.summary?.totalInterviews > 0 && (
         <div className="space-y-6">
+          {/* Habit Consistency: Practice Streaks & Weekly Goal */}
+          <StreakWidget variant="compact" />
+
           {/* Summary KPIs */}
           <SummaryCards summary={data.summary} />
 
