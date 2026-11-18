@@ -10,6 +10,7 @@ import { getUserEmail } from "@/lib/getUserEmail";
 import { db } from "@/utils/db";
 import { MockInterview } from "@/utils/schema";
 import { and, eq } from "drizzle-orm";
+import { isValidLang, DEFAULT_LANG, getLanguageInstruction } from "@/lib/languages";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,7 @@ export async function POST(req) {
     // Parse jsonMockResp on server and bounds-check questionIndex
     let questionText = "";
     let interviewType = "technical";
+    let interviewLang = DEFAULT_LANG;
     try {
       const parsed = JSON.parse(interview[0].jsonMockResp);
       const questionsList = Array.isArray(parsed)
@@ -95,6 +97,9 @@ export async function POST(req) {
       questionText = qObj?.Question || "";
       if (qObj?.Type === "behavioral") {
         interviewType = "behavioral";
+      }
+      if (qObj?.Lang && isValidLang(qObj.Lang)) {
+        interviewLang = qObj.Lang;
       }
     } catch (_) {
       return NextResponse.json({ followUp: null });
@@ -137,7 +142,7 @@ DECISION RULES:
 REQUIREMENTS FOR THE FOLLOW-UP QUESTION:
 - Must be concise, direct, and under 25 words.
 - Max exactly 1 single sentence.
-- Friendly, professional, conversational.
+- Friendly, professional, conversational.${getLanguageInstruction(interviewLang)}
 
 Respond with valid JSON only in this exact schema:
 { "followUp": string | null }`;

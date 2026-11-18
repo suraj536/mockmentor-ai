@@ -18,6 +18,7 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { SUPPORTED_LANGUAGES, DEFAULT_LANG } from "@/lib/languages";
 
 const AddNewInterview = () => {
   const [openDialog, setOpenDialog] = useState(false);
@@ -27,6 +28,7 @@ const AddNewInterview = () => {
   const [loading, setLoading] = useState(false);
   const [jsonResponse, setJsonResponse] = useState([]);
   const [interviewType, setInterviewType] = useState("technical");
+  const [interviewLang, setInterviewLang] = useState(DEFAULT_LANG);
   const [resumeFile, setResumeFile] = useState(null);
   const [fileError, setFileError] = useState("");
   const [jobPosting, setJobPosting] = useState("");
@@ -38,6 +40,7 @@ const AddNewInterview = () => {
 
   const resetForm = () => {
     setInterviewType("technical");
+    setInterviewLang(DEFAULT_LANG);
     handleRemoveFile();
     setJobPosting("");
     setIsPostingExpanded(false);
@@ -107,6 +110,7 @@ const AddNewInterview = () => {
         formData.append("jobDesc", jobDesc);
         formData.append("jobExperience", jobExperience);
         formData.append("type", interviewType);
+        formData.append("lang", interviewLang);
         if (trimmedPosting) {
           formData.append("jobPosting", trimmedPosting);
         }
@@ -123,6 +127,7 @@ const AddNewInterview = () => {
           jobDesc,
           jobExperience,
           type: interviewType,
+          lang: interviewLang,
         };
         if (trimmedPosting) {
           payload.jobPosting = trimmedPosting;
@@ -257,6 +262,28 @@ const AddNewInterview = () => {
                         Behavioral (STAR)
                       </Button>
                     </div>
+                  </div>
+
+                  {/* Interview Language */}
+                  <div className="mt-5 my-3">
+                    <label
+                      htmlFor="interview-language-select"
+                      className="text-sm font-medium text-foreground block mb-1.5"
+                    >
+                      Interview Language
+                    </label>
+                    <select
+                      id="interview-language-select"
+                      value={interviewLang}
+                      onChange={(e) => setInterviewLang(e.target.value)}
+                      className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      {SUPPORTED_LANGUAGES.map((l) => (
+                        <option key={l.code} value={l.code}>
+                          {l.nativeName} ({l.label})
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="mt-7 my-3">

@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Lightbulb, Volume2, VolumeX, RotateCcw, Square, Sparkles } from "lucide-react";
+import { Lightbulb, Volume2, VolumeX, RotateCcw, Square, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSpeech } from "@/lib/useSpeech";
+import { getLangLabel } from "@/lib/languages";
 
 const QuestionSection = ({
   mockInterviewQuestion,
@@ -13,13 +14,24 @@ const QuestionSection = ({
   onSkipFollowUp,
   isHandsFreeActive = false,
   speechHook = null,
+  lang = null,
 }) => {
   const [hasMounted, setHasMounted] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [voiceSpeed, setVoiceSpeed] = useState(1);
+  const [voiceHintDismissed, setVoiceHintDismissed] = useState(false);
 
   const localSpeech = useSpeech();
-  const { isSupported, isSpeaking, isBlocked, speak, cancel } = speechHook || localSpeech;
+  const { isSupported, isSpeaking, isBlocked, voiceFallback, speak, cancel } =
+    speechHook || localSpeech;
+
+  const currentLang =
+    lang || mockInterviewQuestion?.[activeQuestionIndex]?.Lang || "en-US";
+  const langLabel = getLangLabel(currentLang);
+
+  useEffect(() => {
+    setVoiceHintDismissed(false);
+  }, [activeQuestionIndex, currentLang]);
 
   // Load saved preferences safely after mount
   useEffect(() => {
@@ -62,7 +74,7 @@ const QuestionSection = ({
       return;
     }
 
-    speak(currentQuestionText, speedRef.current);
+    speak(currentQuestionText, speedRef.current, null, currentLang);
 
     return () => {
       cancel();
@@ -70,6 +82,7 @@ const QuestionSection = ({
   }, [
     activeQuestionIndex,
     currentQuestionText,
+    currentLang,
     voiceEnabled,
     hasMounted,
     isSupported,
@@ -91,13 +104,14 @@ const QuestionSection = ({
     }
 
     cancel();
-    speak(followUpQuestion, speedRef.current);
+    speak(followUpQuestion, speedRef.current, null, currentLang);
 
     return () => {
       cancel();
     };
   }, [
     followUpQuestion,
+    currentLang,
     voiceEnabled,
     hasMounted,
     isSupported,
@@ -253,7 +267,7 @@ const QuestionSection = ({
                     } else {
                       const textToSpeak = followUpQuestion || currentQuestionText;
                       if (textToSpeak) {
-                        speak(textToSpeak, voiceSpeed);
+                        speak(textToSpeak, voiceSpeed, null, currentLang);
                       }
                     }
                   }}
@@ -305,6 +319,34 @@ const QuestionSection = ({
                 <p className="text-xs text-muted-foreground italic">
                   Tap Replay to hear the question
                 </p>
+              )}
+
+              {/* Voice Fallback Notice */}
+              {voiceFallback && !voiceHintDismissed && currentLang !== "en-US" && (
+                <div
+                  role="status"
+                  className="flex items-start justify-between gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-foreground mt-2"
+                >
+                  <div className="flex items-start gap-2">
+                    <span
+                      className="shrink-0 text-amber-600 dark:text-amber-400 font-semibold"
+                      aria-hidden="true"
+                    >
+                      ⓘ
+                    </span>
+                    <p className="leading-relaxed">
+                      No {langLabel} voice found on this device — read the question above. Install a {langLabel} voice pack in your OS settings for audio.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setVoiceHintDismissed(true)}
+                    aria-label="Dismiss notice"
+                    className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               )}
             </div>
           )}

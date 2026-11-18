@@ -12,6 +12,7 @@ import {
 } from "@/lib/limits";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { normalizeQuestionKey } from "@/lib/utils";
+import { isValidLang, DEFAULT_LANG } from "@/lib/languages";
 
 export const dynamic = "force-dynamic";
 
@@ -197,6 +198,11 @@ export async function POST(req) {
           ? "behavioral"
           : "technical";
 
+      const lang =
+        matchedQ?.Lang && isValidLang(matchedQ.Lang) && matchedQ.Lang !== DEFAULT_LANG
+          ? matchedQ.Lang
+          : null;
+
       const referenceAnswer =
         typeof row.correctAns === "string" && row.correctAns.trim().length > 0
           ? row.correctAns.trim()
@@ -208,6 +214,7 @@ export async function POST(req) {
         Question: row.question.trim(),
         Answer: referenceAnswer,
         Type: type,
+        ...(lang ? { Lang: lang } : {}),
       };
     });
 

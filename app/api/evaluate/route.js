@@ -6,6 +6,7 @@ import {
   GEMINI_MAX_REQUESTS_PER_HOUR,
   GEMINI_WINDOW_MS,
 } from "@/lib/limits";
+import { isValidLang, DEFAULT_LANG, getLanguageInstruction } from "@/lib/languages";
 
 export async function POST(req) {
   try {
@@ -31,10 +32,12 @@ export async function POST(req) {
       );
     }
 
-    const { question, userAnswer, type } = await req.json();
+    const { question, userAnswer, type, lang } = await req.json();
 
     // Validate type — anything other than "behavioral" becomes "technical"
     const interviewType = type === "behavioral" ? "behavioral" : "technical";
+    const interviewLang =
+      typeof lang === "string" && isValidLang(lang) ? lang : DEFAULT_LANG;
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -69,7 +72,7 @@ Score each STAR component from 0 to 10:
 Give an overall rating from 0 to 10 and 3 to 5 lines of feedback that explicitly names any missing or weak STAR components.
 
 Respond with valid JSON only, using exactly these fields:
-{ "situation": number, "task": number, "action": number, "result": number, "rating": number, "feedback": string }`;
+{ "situation": number, "task": number, "action": number, "result": number, "rating": number, "feedback": string }${getLanguageInstruction(interviewLang)}`;
 
       const behavioralResult = await model.generateContent(behavioralPrompt);
       let raw = behavioralResult.response.text();
@@ -114,7 +117,8 @@ Respond with valid JSON only, using exactly these fields:
       userAnswer +
       " , Depends on question and user answer for given interview question" +
       " please give us rating for answer and feedback as area of improvement if any " +
-      "in just 3 to 5 lines to improve it in JSON format with rating field and feedback field";
+      "in just 3 to 5 lines to improve it in JSON format with rating field and feedback field" +
+      getLanguageInstruction(interviewLang);
 
     const result = await model.generateContent(feedbackPrompt);
 

@@ -6,6 +6,7 @@ import {
   GEMINI_MAX_REQUESTS_PER_HOUR,
   GEMINI_WINDOW_MS,
 } from "@/lib/limits";
+import { isValidLang, DEFAULT_LANG, getLangLabel } from "@/lib/languages";
 
 export async function POST(req) {
   try {
@@ -31,7 +32,7 @@ export async function POST(req) {
       );
     }
 
-    const { base64Audio, mimeType } = await req.json();
+    const { base64Audio, mimeType, lang } = await req.json();
 
     if (!base64Audio) {
       return NextResponse.json(
@@ -48,13 +49,24 @@ export async function POST(req) {
       );
     }
 
+    const interviewLang =
+      typeof lang === "string" && isValidLang(lang) ? lang : DEFAULT_LANG;
+
+    const transcribePrompt =
+      interviewLang === DEFAULT_LANG
+        ? "Transcribe the following audio:"
+        : `Transcribe the following audio exactly as spoken in ${getLangLabel(interviewLang)}.
+Preserve the original language and script. Do NOT translate. Do NOT add commentary.
+If the speaker mixes languages (code-switching), preserve both scripts as heard.
+Output only the transcription.`;
+
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
     });
 
     const result = await model.generateContent([
-      "Transcribe the following audio:",
+      transcribePrompt,
       { inlineData: { data: base64Audio, mimeType: mimeType || "audio/webm" } },
     ]);
 

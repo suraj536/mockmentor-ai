@@ -15,6 +15,7 @@ import { db } from "@/utils/db";
 import { MockInterview, Question } from "@/utils/schema";
 import { and, eq, sql } from "drizzle-orm";
 import moment from "moment";
+import { isValidLang, DEFAULT_LANG, getLanguageInstruction } from "@/lib/languages";
 
 export async function POST(req) {
   try {
@@ -41,7 +42,7 @@ export async function POST(req) {
     }
 
     const contentType = req.headers.get("content-type") || "";
-    let mode, jobPosition, jobDesc, jobExperience, typeQuestion, company, type, jobPosting;
+    let mode, jobPosition, jobDesc, jobExperience, typeQuestion, company, type, jobPosting, lang;
     let resumeFile = null;
 
     if (contentType.includes("multipart/form-data")) {
@@ -54,10 +55,11 @@ export async function POST(req) {
       company = formData.get("company");
       type = formData.get("type");
       jobPosting = formData.get("jobPosting");
+      lang = formData.get("lang");
       resumeFile = formData.get("resume");
     } else {
       const body = await req.json();
-      ({ mode, jobPosition, jobDesc, jobExperience, typeQuestion, company, type, jobPosting } = body);
+      ({ mode, jobPosition, jobDesc, jobExperience, typeQuestion, company, type, jobPosting, lang } = body);
     }
 
     if (mode !== "questions") {
@@ -190,6 +192,11 @@ export async function POST(req) {
     const interviewType =
       mode === "interview" && type === "behavioral" ? "behavioral" : "technical";
 
+    const interviewLang =
+      mode === "interview" && typeof lang === "string" && isValidLang(lang)
+        ? lang
+        : DEFAULT_LANG;
+
     const userEmail = await getUserEmail();
     if (userEmail) {
       const today = moment().format("YYYY-MM-DD");
@@ -280,7 +287,7 @@ Based on the target job posting and the candidate's attached resume, generate ex
 4. For each question, provide a comprehensive model STAR answer covering Situation, Task, Action, and Result.
 
 Return a JSON array where every element has exactly two string fields: "Question" and "Answer".
-Return only the JSON array, no extra text or explanations.`;
+Return only the JSON array, no extra text or explanations.${getLanguageInstruction(interviewLang)}`;
       } else if (sanitizedPosting) {
         InputPrompt = `You are an expert behavioral interviewer conducting a mock interview tailored to a target job posting.
 Target Role Information:
@@ -301,7 +308,7 @@ Based on the target role and the provided job posting, generate exactly 5 behavi
 4. For each question, provide a model STAR answer covering Situation, Task, Action, and Result.
 
 Return a JSON array where every element has exactly two string fields: "Question" and "Answer".
-Return only the JSON array, no extra text or explanations.`;
+Return only the JSON array, no extra text or explanations.${getLanguageInstruction(interviewLang)}`;
       } else if (resumeBase64) {
         InputPrompt = `You are an expert behavioral interviewer conducting a mock interview.
 Target Role Information:
@@ -319,7 +326,7 @@ Based on the target role and the candidate's attached resume, generate exactly 5
 4. For each question, provide a comprehensive model STAR answer covering Situation, Task, Action, and Result.
 
 Return a JSON array where every element has exactly two string fields: "Question" and "Answer".
-Return only the JSON array, no extra text or explanations.`;
+Return only the JSON array, no extra text or explanations.${getLanguageInstruction(interviewLang)}`;
       } else {
         InputPrompt = `Job Position: ${jobPosition}
 Job Description: ${jobDesc}
@@ -328,7 +335,7 @@ Generate exactly 5 behavioral interview questions appropriate for this role and 
 Each question must start with "Tell me about a time..." or use similar behavioral phrasing.
 For each question, provide a model STAR answer covering Situation, Task, Action, and Result.
 Return a JSON array where every element has exactly two string fields: "Question" and "Answer".
-Return only the JSON array, no extra text.`;
+Return only the JSON array, no extra text.${getLanguageInstruction(interviewLang)}`;
       }
     } else {
       if (sanitizedPosting && resumeBase64) {
@@ -354,7 +361,7 @@ Based on the target job posting and the candidate's attached resume, generate ex
 4. Ensure "Question" and "Answer" are fields in the JSON.
 
 Return a JSON array where every element has exactly two string fields: "Question" and "Answer".
-Return only the JSON array, no extra text or explanations.`;
+Return only the JSON array, no extra text or explanations.${getLanguageInstruction(interviewLang)}`;
       } else if (sanitizedPosting) {
         InputPrompt = `You are an expert technical interviewer conducting a mock interview tailored to a target job posting.
 Target Role Information:
@@ -375,7 +382,7 @@ Based on the target role and the provided job posting, generate exactly 5 techni
 4. Ensure "Question" and "Answer" are fields in the JSON.
 
 Return a JSON array where every element has exactly two string fields: "Question" and "Answer".
-Return only the JSON array, no extra text or explanations.`;
+Return only the JSON array, no extra text or explanations.${getLanguageInstruction(interviewLang)}`;
       } else if (resumeBase64) {
         InputPrompt = `You are an expert technical interviewer conducting a mock interview.
 Target Role Information:
@@ -393,14 +400,14 @@ Based on the target role and the candidate's attached resume, generate exactly 5
 4. Ensure "Question" and "Answer" are fields in the JSON.
 
 Return a JSON array where every element has exactly two string fields: "Question" and "Answer".
-Return only the JSON array, no extra text or explanations.`;
+Return only the JSON array, no extra text or explanations.${getLanguageInstruction(interviewLang)}`;
       } else {
         InputPrompt = `
   Job Position: ${jobPosition}, 
   Job Description: ${jobDesc}, 
   Years of Experience: ${jobExperience}. 
   Based on this information, please provide 5 interview questions with answers in JSON format, ensuring "Question" and "Answer" are fields in the JSON.
-`;
+${getLanguageInstruction(interviewLang)}`;
       }
     }
 
@@ -547,6 +554,7 @@ Return only the JSON array, no extra text or explanations.`;
           Question: item.Question.trim(),
           Answer: item.Answer.trim(),
           Type: interviewType,
+          ...(interviewLang !== DEFAULT_LANG ? { Lang: interviewLang } : {}),
         }));
 
       // Validate exactly five valid question objects are returned

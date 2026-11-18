@@ -35,6 +35,8 @@ const RecordAnswerSection = ({
   const [mode, setMode] = useState(followUpQuestion ? "followup" : "main");
   const activeIndexRef = useRef(activeQuestionIndex);
   const lastMainAnswerRef = useRef("");
+  const currentLang =
+    mockInterviewQuestion?.[activeQuestionIndex]?.Lang || "en-US";
 
   useEffect(() => {
     activeIndexRef.current = activeQuestionIndex;
@@ -115,6 +117,7 @@ const RecordAnswerSection = ({
             body: JSON.stringify({
               base64Audio,
               mimeType: "audio/webm",
+              lang: currentLang,
             }),
           });
 
@@ -167,6 +170,7 @@ const RecordAnswerSection = ({
             question: capturedQuestion,
             userAnswer: answerToEvaluate,
             type: capturedType,
+            lang: currentLang,
           }),
         });
 
@@ -293,6 +297,7 @@ const RecordAnswerSection = ({
           question: capturedQuestion,
           userAnswer: combinedAns,
           type: capturedType,
+          lang: currentLang,
         }),
       });
 

@@ -11,6 +11,7 @@ import { db } from "@/utils/db";
 import { MockInterview, UserAnswer } from "@/utils/schema";
 import { and, eq } from "drizzle-orm";
 import { normalizeQuestionKey } from "@/lib/utils";
+import { isValidLang, DEFAULT_LANG, getLanguageInstruction } from "@/lib/languages";
 
 export const dynamic = "force-dynamic";
 
@@ -112,6 +113,7 @@ export async function POST(req) {
     // 2. STAR: sentinel in stored feedback
     // 3. Fallback to technical
     let interviewType = null;
+    let interviewLang = DEFAULT_LANG;
     try {
       const parsedMock = JSON.parse(interviewResult[0].jsonMockResp);
       const questionsList = Array.isArray(parsedMock)
@@ -130,6 +132,9 @@ export async function POST(req) {
           String(matchedQuestion.Type).toLowerCase() === "behavioral"
             ? "behavioral"
             : "technical";
+      }
+      if (matchedQuestion?.Lang && isValidLang(matchedQuestion.Lang)) {
+        interviewLang = matchedQuestion.Lang;
       }
     } catch (_) {
       // Ignore JSON parse error from stored jsonMockResp
@@ -182,7 +187,7 @@ Instructions:
    - The improved answer must use ONLY facts, events, and actions the candidate explicitly described.
    - DO NOT invent companies, metrics, percentages, tools, or achievements.
    - Where a STAR component, context, or measurable result is missing, insert a clearly bracketed placeholder such as [describe specific task responsibility here], [insert measurable metric or percentage here], or [state resolution outcome here].
-   - If the candidate answer includes an initial response and a follow-up inquiry separated by '---' and 'Follow-up:', treat the entire thread as the candidate's full response.
+   - If the candidate answer includes an initial response and a follow-up inquiry separated by '---' and 'Follow-up:', treat the entire thread as the candidate's full response.${getLanguageInstruction(interviewLang)}
 
 Respond with a JSON object matching this schema:
 {
@@ -211,7 +216,7 @@ Instructions:
    - DO NOT invent technologies, numbers, tools, companies, or results that the candidate did not state.
    - DO NOT copy the Reference Ideal Answer into the rewrite.
    - Where a concept, mechanism, or metric is missing, insert a clearly bracketed placeholder such as [explain how X works here] or [mention trade-off here].
-   - If the candidate answer includes an initial response and a follow-up inquiry separated by '---' and 'Follow-up:', treat the entire thread as the candidate's full response.
+   - If the candidate answer includes an initial response and a follow-up inquiry separated by '---' and 'Follow-up:', treat the entire thread as the candidate's full response.${getLanguageInstruction(interviewLang)}
 
 Respond with a JSON object matching this schema:
 {
