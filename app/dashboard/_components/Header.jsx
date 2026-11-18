@@ -31,6 +31,7 @@ const Header = ({ logo }) => {
 
   const navLinks = [
     { href: "/dashboard", label: "Dashboard" },
+    { href: "/dashboard/progress", label: "Progress" },
     { href: "/dashboard/question", label: "Questions" },
     { href: "/dashboard/howit", label: "How it works?" },
   ];

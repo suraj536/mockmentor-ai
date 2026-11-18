@@ -10,20 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
-import { formatExperience } from "@/lib/utils";
-
-// Parses the STAR sentinel line prepended by evaluate/route.js for behavioral answers.
-// Returns { star: { S, T, A, R }, text } when found, or { star: null, text } otherwise.
-function parseStarFeedback(feedbackText) {
-  const match = feedbackText?.match(
-    /^STAR:S=(\d+),T=(\d+),A=(\d+),R=(\d+)\n([\s\S]*)$/
-  );
-  if (!match) return { star: null, text: feedbackText ?? "" };
-  return {
-    star: { S: +match[1], T: +match[2], A: +match[3], R: +match[4] },
-    text: match[5],
-  };
-}
+import { formatExperience, parseStarFeedback } from "@/lib/utils";
 
 const Feedback = ({ params }) => {
   const router = useRouter();
