@@ -13,10 +13,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { LoaderCircle, PlusCircle, FileText, UploadCloud, X } from "lucide-react";
+import { LoaderCircle, PlusCircle, FileText, UploadCloud, X, Briefcase, ChevronDown } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const AddNewInterview = () => {
   const [openDialog, setOpenDialog] = useState(false);
@@ -28,9 +29,20 @@ const AddNewInterview = () => {
   const [interviewType, setInterviewType] = useState("technical");
   const [resumeFile, setResumeFile] = useState(null);
   const [fileError, setFileError] = useState("");
+  const [jobPosting, setJobPosting] = useState("");
+  const [isPostingExpanded, setIsPostingExpanded] = useState(false);
+  const [postingError, setPostingError] = useState("");
   const fileInputRef = useRef(null);
   const { user } = useUser();
   const router = useRouter();
+
+  const resetForm = () => {
+    setInterviewType("technical");
+    handleRemoveFile();
+    setJobPosting("");
+    setIsPostingExpanded(false);
+    setPostingError("");
+  };
 
   const handleFileSelect = (file) => {
     setFileError("");
@@ -70,8 +82,21 @@ const AddNewInterview = () => {
   };
 
   const onSubmit = async (e) => {
-    setLoading(true);
     e.preventDefault();
+
+    const trimmedPosting = (jobPosting || "").trim();
+    if (trimmedPosting.length > 0 && trimmedPosting.length < 50) {
+      setPostingError("Job posting must be at least 50 characters, or clear the field.");
+      toast("Job posting is too short. Please provide at least 50 characters or clear the field.");
+      return;
+    }
+    if (trimmedPosting.length > 6000) {
+      setPostingError("Job posting exceeds the 6,000 character limit.");
+      toast("Job posting exceeds the 6,000 character limit.");
+      return;
+    }
+
+    setLoading(true);
 
     try {
       let res;
@@ -82,6 +107,9 @@ const AddNewInterview = () => {
         formData.append("jobDesc", jobDesc);
         formData.append("jobExperience", jobExperience);
         formData.append("type", interviewType);
+        if (trimmedPosting) {
+          formData.append("jobPosting", trimmedPosting);
+        }
         formData.append("resume", resumeFile);
 
         res = await fetch("/api/generate-questions", {
@@ -89,16 +117,21 @@ const AddNewInterview = () => {
           body: formData,
         });
       } else {
+        const payload = {
+          mode: "interview",
+          jobPosition,
+          jobDesc,
+          jobExperience,
+          type: interviewType,
+        };
+        if (trimmedPosting) {
+          payload.jobPosting = trimmedPosting;
+        }
+
         res = await fetch("/api/generate-questions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mode: "interview",
-            jobPosition,
-            jobDesc,
-            jobExperience,
-            type: interviewType,
-          }),
+          body: JSON.stringify(payload),
         });
       }
 
@@ -145,8 +178,7 @@ const AddNewInterview = () => {
         const resp = await dbRes.json();
 
         if (resp) {
-          setInterviewType("technical");
-          handleRemoveFile();
+          resetForm();
           setOpenDialog(false);
           router.push("/dashboard/interview/" + resp[0]?.mockId);
         }
@@ -183,8 +215,7 @@ const AddNewInterview = () => {
         onOpenChange={(open) => {
           setOpenDialog(open);
           if (!open) {
-            setInterviewType("technical");
-            handleRemoveFile();
+            resetForm();
           }
         }}
       >
@@ -248,6 +279,94 @@ const AddNewInterview = () => {
                       onChange={(e) => setJobDesc(e.target.value)}
                     />
                   </div>
+
+                  {/* Collapsible Target Job Posting (Optional) */}
+                  <div className="my-5 rounded-lg border border-border/60 bg-muted/20 p-3 sm:p-4 transition-all">
+                    <button
+                      type="button"
+                      onClick={() => setIsPostingExpanded((prev) => !prev)}
+                      className="flex items-center justify-between w-full text-sm font-medium text-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md"
+                      aria-expanded={isPostingExpanded}
+                      aria-controls="target-job-posting-panel"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Briefcase className="h-4 w-4 text-primary" />
+                        Target Job Posting <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                          isPostingExpanded && "rotate-180"
+                        )}
+                        aria-hidden="true"
+                      />
+                    </button>
+
+                    {isPostingExpanded && (
+                      <div id="target-job-posting-panel" className="mt-3 space-y-2">
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Paste the full job listing (responsibilities, required qualifications, and domain) to tailor the interview questions directly to the role.
+                        </p>
+                        <Textarea
+                          id="target-job-posting"
+                          value={jobPosting}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setJobPosting(val);
+                            const len = val.trim().length;
+                            if (len > 0 && len < 50) {
+                              setPostingError("Must be at least 50 characters, or clear the field.");
+                            } else if (len > 6000) {
+                              setPostingError("Exceeds 6,000 character limit.");
+                            } else {
+                              setPostingError("");
+                            }
+                          }}
+                          placeholder="Paste responsibilities, must-have skills, qualifications, or requirements from the job posting..."
+                          maxLength={6000}
+                          rows={5}
+                          className="mt-1 text-sm bg-background resize-y min-h-[110px]"
+                          aria-label="Target job posting text"
+                          aria-describedby="job-posting-counter job-posting-error"
+                        />
+                        <div className="flex items-center justify-between text-xs pt-1 flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <span
+                              id="job-posting-counter"
+                              className={cn(
+                                "font-medium",
+                                jobPosting.length > 5500
+                                  ? "text-amber-600 dark:text-amber-400"
+                                  : "text-muted-foreground"
+                              )}
+                            >
+                              {jobPosting.length.toLocaleString()} / 6,000 characters
+                            </span>
+                            {postingError && (
+                              <span id="job-posting-error" className="text-destructive font-medium">
+                                • {postingError}
+                              </span>
+                            )}
+                          </div>
+                          {jobPosting.length > 0 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setJobPosting("");
+                                setPostingError("");
+                              }}
+                              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted"
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="my-5">
                     <label className="text-sm font-medium text-foreground">Years of Experience</label>
                     <Input
@@ -341,8 +460,7 @@ const AddNewInterview = () => {
                     type="button"
                     variant="ghost"
                     onClick={() => {
-                      setInterviewType("technical");
-                      handleRemoveFile();
+                      resetForm();
                       setOpenDialog(false);
                     }}
                   >
