@@ -13,6 +13,10 @@ const RecordAnswerSection = ({
   mockInterviewQuestion,
   activeQuestionIndex,
   interviewData,
+  followUpQuestion,
+  setFollowUpQuestion,
+  followUpRowId,
+  setFollowUpRowId,
 }) => {
   const [userAnswer, setUserAnswer] = useState("");
   const { user } = useUser();
@@ -22,11 +26,37 @@ const RecordAnswerSection = ({
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
 
+  const [mode, setMode] = useState(followUpQuestion ? "followup" : "main");
+  const activeIndexRef = useRef(activeQuestionIndex);
+  const lastMainAnswerRef = useRef("");
+
+  useEffect(() => {
+    activeIndexRef.current = activeQuestionIndex;
+    setUserAnswer("");
+    setLoading(false);
+    if (isRecording && mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  }, [activeQuestionIndex]);
+
+  useEffect(() => {
+    if (followUpQuestion) {
+      setMode("followup");
+    } else {
+      setMode("main");
+    }
+  }, [followUpQuestion]);
+
   useEffect(() => {
     if (!isRecording && userAnswer.length > 10) {
-      updateUserAnswer();
+      if (mode === "main") {
+        updateUserAnswer();
+      } else if (mode === "followup") {
+        updateFollowUpAnswer();
+      }
     }
-  }, [userAnswer]);
+  }, [userAnswer, isRecording, mode]);
 
   const startRecording = async () => {
     try {
@@ -111,62 +141,208 @@ const RecordAnswerSection = ({
   };
 
   const updateUserAnswer = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/evaluate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: mockInterviewQuestion[activeQuestionIndex]?.Question,
-          userAnswer: userAnswer,
-          type: mockInterviewQuestion[activeQuestionIndex]?.Type ?? "technical",
-        }),
-      });
+    const capturedIndex = activeQuestionIndex;
+    const capturedQuestion = mockInterviewQuestion?.[capturedIndex]?.Question;
+    const capturedCorrectAns = mockInterviewQuestion?.[capturedIndex]?.Answer;
+    const capturedType = mockInterviewQuestion?.[capturedIndex]?.Type ?? "technical";
+    const answerToEvaluate = userAnswer;
 
-      if (!res.ok) {
-        let errorMsg = "Failed to evaluate answer";
+    setUserAnswer("");
+    setLoading(true);
+    lastMainAnswerRef.current = answerToEvaluate;
+
+    try {
+      // 1. Evaluate and save main answer
+      const evaluateAndSavePromise = (async () => {
+        const res = await fetch("/api/evaluate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question: capturedQuestion,
+            userAnswer: answerToEvaluate,
+            type: capturedType,
+          }),
+        });
+
+        if (!res.ok) {
+          let errorMsg = "Failed to evaluate answer";
+          try {
+            const errData = await res.json();
+            if (errData?.error) errorMsg = errData.error;
+          } catch (_) {}
+          throw new Error(errorMsg);
+        }
+
+        const jsonFeedbackResp = await res.json();
+
+        const resDb = await fetch(
+          `/api/interviews/${interviewData?.mockId}/answers`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              question: capturedQuestion,
+              correctAns: capturedCorrectAns,
+              userAns: answerToEvaluate,
+              feedback: jsonFeedbackResp?.feedback,
+              rating: String(jsonFeedbackResp?.rating ?? ""),
+            }),
+          }
+        );
+
+        if (!resDb.ok) {
+          let errorMsg = "An error occurred while recording the user answer";
+          try {
+            const errData = await resDb.json();
+            if (errData?.error) errorMsg = errData.error;
+          } catch (_) {}
+          throw new Error(errorMsg);
+        }
+
+        const dbData = await resDb.json();
+        return { jsonFeedbackResp, savedRowId: dbData?.id };
+      })();
+
+      // 2. Parallel follow-up check with strict 5-second timeout
+      const followUpPromise = (async () => {
         try {
-          const errData = await res.json();
-          if (errData?.error) errorMsg = errData.error;
-        } catch (_) {}
-        toast(errorMsg);
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 5000);
+
+          const res = await fetch("/api/followup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              interviewId: interviewData?.mockId,
+              questionIndex: capturedIndex,
+              userAnswer: answerToEvaluate,
+            }),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timer);
+          if (res.ok) {
+            const data = await res.json();
+            return data?.followUp || null;
+          }
+          return null;
+        } catch (_) {
+          return null; // Silently fallback on timeout or error
+        }
+      })();
+
+      const [saveResult, followUpText] = await Promise.all([
+        evaluateAndSavePromise,
+        followUpPromise,
+      ]);
+
+      // Race protection: ignore if user changed questions while waiting
+      if (activeIndexRef.current !== capturedIndex) {
         setLoading(false);
         return;
       }
 
-      const jsonFeedbackResp = await res.json();
+      toast("User Answer recorded successfully");
 
-      const resDb = await fetch(
+      if (followUpText && saveResult?.savedRowId) {
+        setFollowUpRowId?.(saveResult.savedRowId);
+        setFollowUpQuestion?.(followUpText);
+        setMode("followup");
+      } else {
+        setFollowUpQuestion?.(null);
+        setFollowUpRowId?.(null);
+        setMode("main");
+      }
+    } catch (error) {
+      if (activeIndexRef.current === capturedIndex) {
+        toast(error.message || "An error occurred while recording the user answer");
+      }
+    } finally {
+      if (activeIndexRef.current === capturedIndex) {
+        setLoading(false);
+      }
+    }
+  };
+
+  const updateFollowUpAnswer = async () => {
+    const capturedIndex = activeQuestionIndex;
+    const capturedRowId = followUpRowId;
+    const capturedQuestion = mockInterviewQuestion?.[capturedIndex]?.Question;
+    const capturedType = mockInterviewQuestion?.[capturedIndex]?.Type ?? "technical";
+    const followUpQ = followUpQuestion;
+    const followUpAns = userAnswer;
+
+    setUserAnswer("");
+    setLoading(true);
+
+    try {
+      const originalAns = lastMainAnswerRef.current || "";
+      const combinedAns = `${originalAns}\n---\nFollow-up: ${followUpQ}\nCandidate: ${followUpAns}`;
+
+      // Re-evaluate combined answer with /api/evaluate
+      const evalRes = await fetch("/api/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: capturedQuestion,
+          userAnswer: combinedAns,
+          type: capturedType,
+        }),
+      });
+
+      if (!evalRes.ok) {
+        let errorMsg = "Failed to evaluate follow-up answer";
+        try {
+          const errData = await evalRes.json();
+          if (errData?.error) errorMsg = errData.error;
+        } catch (_) {}
+        throw new Error(errorMsg);
+      }
+
+      const evalData = await evalRes.json();
+
+      // PATCH the existing row with updated rating and feedback
+      const patchRes = await fetch(
         `/api/interviews/${interviewData?.mockId}/answers`,
         {
-          method: "POST",
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            question: mockInterviewQuestion[activeQuestionIndex]?.Question,
-            correctAns: mockInterviewQuestion[activeQuestionIndex]?.Answer,
-            userAns: userAnswer,
-            feedback: jsonFeedbackResp?.feedback,
-            rating: String(jsonFeedbackResp?.rating ?? ""),
+            answerId: capturedRowId,
+            userAns: combinedAns,
+            feedback: evalData?.feedback,
+            rating: String(evalData?.rating ?? ""),
           }),
         }
       );
 
-      if (resDb.ok) {
-        toast("User Answer recorded successfully");
-      } else {
-        let errorMsg = "An error occurred while recording the user answer";
+      if (!patchRes.ok) {
+        let errorMsg = "Failed to update answer with follow-up";
         try {
-          const errData = await resDb.json();
+          const errData = await patchRes.json();
           if (errData?.error) errorMsg = errData.error;
         } catch (_) {}
-        toast(errorMsg);
+        throw new Error(errorMsg);
       }
-      setUserAnswer("");
-      setLoading(false);
-    } catch (error) {
-      console.error(error);
-      toast("An error occurred while recording the user answer");
-      setLoading(false);
+
+      // Race protection
+      if (activeIndexRef.current !== capturedIndex) {
+        setLoading(false);
+        return;
+      }
+
+      toast("Follow-up answer recorded successfully");
+      setFollowUpQuestion?.(null);
+      setFollowUpRowId?.(null);
+      setMode("main");
+    } catch (err) {
+      if (activeIndexRef.current === capturedIndex) {
+        toast(err.message || "An error occurred while updating follow-up answer");
+      }
+    } finally {
+      if (activeIndexRef.current === capturedIndex) {
+        setLoading(false);
+      }
     }
   };
 
@@ -240,7 +416,7 @@ const RecordAnswerSection = ({
           {loading ? (
             <span className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Saving response...
+              {mode === "followup" ? "Saving follow-up..." : "Saving response..."}
             </span>
           ) : isRecording ? (
             <span className="flex items-center gap-2">
@@ -250,14 +426,16 @@ const RecordAnswerSection = ({
           ) : (
             <span className="flex items-center gap-2">
               <Mic className="h-4 w-4" />
-              Record Answer
+              {mode === "followup" ? "Record Follow-up Answer" : "Record Answer"}
             </span>
           )}
         </Button>
       </div>
 
       <p className="text-xs text-center text-muted-foreground max-w-sm">
-        Click Record Answer and speak clearly. Click Stop Recording when finished to submit.
+        {mode === "followup"
+          ? "Click Record Follow-up Answer to respond, or click Skip follow-up on the left."
+          : "Click Record Answer and speak clearly. Click Stop Recording when finished to submit."}
       </p>
     </div>
   );

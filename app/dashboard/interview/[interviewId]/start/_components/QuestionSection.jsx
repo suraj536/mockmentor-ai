@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Lightbulb, Volume2, VolumeX, RotateCcw, Square } from "lucide-react";
+import { Lightbulb, Volume2, VolumeX, RotateCcw, Square, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSpeech } from "@/lib/useSpeech";
 
@@ -9,6 +9,8 @@ const QuestionSection = ({
   mockInterviewQuestion,
   activeQuestionIndex,
   setActiveQuestionIndex,
+  followUpQuestion,
+  onSkipFollowUp,
 }) => {
   const [hasMounted, setHasMounted] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
@@ -59,6 +61,27 @@ const QuestionSection = ({
   }, [
     activeQuestionIndex,
     currentQuestionText,
+    voiceEnabled,
+    hasMounted,
+    isSupported,
+    speak,
+    cancel,
+  ]);
+
+  // Auto-read follow-up question when it appears
+  useEffect(() => {
+    if (!hasMounted || !isSupported || !voiceEnabled || !followUpQuestion) {
+      return;
+    }
+
+    cancel();
+    speak(followUpQuestion, speedRef.current);
+
+    return () => {
+      cancel();
+    };
+  }, [
+    followUpQuestion,
     voiceEnabled,
     hasMounted,
     isSupported,
@@ -145,6 +168,32 @@ const QuestionSection = ({
             {currentQuestionText}
           </h3>
 
+          {/* Adaptive Follow-up Question Card */}
+          {followUpQuestion && (
+            <div className="p-4 rounded-xl border border-primary/30 bg-primary/5 dark:bg-primary/10 space-y-2.5 transition-all">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/20">
+                  <Sparkles className="h-3 w-3" />
+                  Follow-up Question
+                </span>
+                {onSkipFollowUp && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={onSkipFollowUp}
+                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                  >
+                    Skip follow-up
+                  </Button>
+                )}
+              </div>
+              <p className="text-sm sm:text-base font-semibold text-foreground leading-relaxed">
+                {followUpQuestion}
+              </p>
+            </div>
+          )}
+
           {/* AI Voice Interviewer Controls (Rendered after mount when supported) */}
           {hasMounted && isSupported && (
             <div className="space-y-2 pt-1 border-t border-border/40">
@@ -184,8 +233,11 @@ const QuestionSection = ({
                   onClick={() => {
                     if (isSpeaking) {
                       cancel();
-                    } else if (currentQuestionText) {
-                      speak(currentQuestionText, voiceSpeed);
+                    } else {
+                      const textToSpeak = followUpQuestion || currentQuestionText;
+                      if (textToSpeak) {
+                        speak(textToSpeak, voiceSpeed);
+                      }
                     }
                   }}
                   aria-label={

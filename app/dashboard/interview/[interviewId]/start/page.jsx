@@ -10,6 +10,8 @@ const StartInterview = ({ params }) => {
   const [interviewData, setInterviewData] = useState();
   const [mockInterviewQuestion, setMockInterviewQuestion] = useState();
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  const [followUpQuestion, setFollowUpQuestion] = useState(null);
+  const [followUpRowId, setFollowUpRowId] = useState(null);
 
   useEffect(() => {
     GetInterviewDetails();
@@ -31,6 +33,29 @@ const StartInterview = ({ params }) => {
     }
   };
 
+  const handleSelectQuestion = (index) => {
+    setFollowUpQuestion(null);
+    setFollowUpRowId(null);
+    setActiveQuestionIndex(index);
+  };
+
+  const handleNextQuestion = () => {
+    setFollowUpQuestion(null);
+    setFollowUpRowId(null);
+    setActiveQuestionIndex((prev) => prev + 1);
+  };
+
+  const handlePrevQuestion = () => {
+    setFollowUpQuestion(null);
+    setFollowUpRowId(null);
+    setActiveQuestionIndex((prev) => prev - 1);
+  };
+
+  const handleSkipFollowUp = () => {
+    setFollowUpQuestion(null);
+    setFollowUpRowId(null);
+  };
+
   return (
     <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
@@ -38,7 +63,9 @@ const StartInterview = ({ params }) => {
         <QuestionSection
           mockInterviewQuestion={mockInterviewQuestion}
           activeQuestionIndex={activeQuestionIndex}
-          setActiveQuestionIndex={setActiveQuestionIndex}
+          setActiveQuestionIndex={handleSelectQuestion}
+          followUpQuestion={followUpQuestion}
+          onSkipFollowUp={handleSkipFollowUp}
         />
 
         {/* Video/audio Recording */}
@@ -46,6 +73,10 @@ const StartInterview = ({ params }) => {
           mockInterviewQuestion={mockInterviewQuestion}
           activeQuestionIndex={activeQuestionIndex}
           interviewData={interviewData}
+          followUpQuestion={followUpQuestion}
+          setFollowUpQuestion={setFollowUpQuestion}
+          followUpRowId={followUpRowId}
+          setFollowUpRowId={setFollowUpRowId}
         />
       </div>
 
@@ -55,7 +86,7 @@ const StartInterview = ({ params }) => {
           <Button
             variant="outline"
             className="gap-1.5"
-            onClick={() => setActiveQuestionIndex(activeQuestionIndex - 1)}
+            onClick={handlePrevQuestion}
           >
             <ChevronLeft className="h-4 w-4" />
             Previous Question
@@ -66,7 +97,7 @@ const StartInterview = ({ params }) => {
           activeQuestionIndex !== mockInterviewQuestion.length - 1 && (
             <Button
               className="gap-1.5"
-              onClick={() => setActiveQuestionIndex(activeQuestionIndex + 1)}
+              onClick={handleNextQuestion}
             >
               Next Question
               <ChevronRight className="h-4 w-4" />
