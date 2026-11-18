@@ -7,6 +7,8 @@ import {
   GEMINI_WINDOW_MS,
   DAILY_INTERVIEWS_CAP,
   DAILY_QUESTIONS_CAP,
+  INTERVIEW_CREATE_MAX_PER_HOUR,
+  INTERVIEW_CREATE_WINDOW_MS,
 } from "@/lib/limits";
 import { getUserEmail } from "@/lib/getUserEmail";
 import { db } from "@/utils/db";
@@ -55,6 +57,30 @@ export async function POST(req) {
     } else {
       const body = await req.json();
       ({ mode, jobPosition, jobDesc, jobExperience, typeQuestion, company, type } = body);
+    }
+
+    if (mode !== "questions") {
+      const forwarded = req.headers.get("x-forwarded-for");
+      const realIp = req.headers.get("x-real-ip");
+      const clientIp = forwarded ? forwarded.split(",")[0].trim() : realIp || null;
+      const createRateKey = userId ? `create:${userId}` : (clientIp ? `create:${clientIp}` : "create:unknown");
+
+      const createRateCheck = checkRateLimit(
+        createRateKey,
+        INTERVIEW_CREATE_MAX_PER_HOUR,
+        INTERVIEW_CREATE_WINDOW_MS
+      );
+      if (!createRateCheck.success) {
+        return NextResponse.json(
+          {
+            error: `Rate limit reached. You can create up to ${INTERVIEW_CREATE_MAX_PER_HOUR} interviews per hour. Please try again later.`,
+          },
+          {
+            status: 429,
+            headers: { "Retry-After": String(createRateCheck.retryAfterSeconds) },
+          }
+        );
+      }
     }
 
     // Validate resume PDF if present
