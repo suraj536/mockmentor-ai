@@ -16,6 +16,11 @@ const starAdviceMap = {
 
 const round1 = (num) => Math.round(num * 10) / 10;
 
+function normalizeQuestionKey(text) {
+  if (typeof text !== "string") return "";
+  return text.trim().replace(/\s+/g, " ");
+}
+
 export async function GET() {
   try {
     const userEmail = await getUserEmail();
@@ -90,6 +95,7 @@ export async function GET() {
         .select({
           id: UserAnswer.id,
           mockIdRef: UserAnswer.mockIdRef,
+          question: UserAnswer.question,
           rating: UserAnswer.rating,
           feedback: UserAnswer.feedback,
           createdAt: UserAnswer.createdAt,
@@ -133,13 +139,34 @@ export async function GET() {
       }
     }
 
-    // Group answers by mockIdRef (ignore any whose interview isn't in mockIdSet)
+    // Deduplicate answers by (mockIdRef, normalized question key), keeping the highest id
+    // and preserving first-seen order per interview
     const answersByMockId = new Map();
+    let totalDeduplicatedAnswers = 0;
+
     for (const ans of rawAnswers) {
       if (!mockIdSet.has(ans.mockIdRef)) continue;
-      const list = answersByMockId.get(ans.mockIdRef) || [];
-      list.push(ans);
-      answersByMockId.set(ans.mockIdRef, list);
+
+      let interviewGroup = answersByMockId.get(ans.mockIdRef);
+      if (!interviewGroup) {
+        interviewGroup = { order: [], map: new Map() };
+        answersByMockId.set(ans.mockIdRef, interviewGroup);
+      }
+
+      const normKey = normalizeQuestionKey(ans.question);
+      if (!interviewGroup.map.has(normKey)) {
+        interviewGroup.order.push(normKey);
+        interviewGroup.map.set(normKey, ans);
+      } else {
+        const existing = interviewGroup.map.get(normKey);
+        if (ans.id > existing.id) {
+          interviewGroup.map.set(normKey, ans);
+        }
+      }
+    }
+
+    for (const group of answersByMockId.values()) {
+      totalDeduplicatedAnswers += group.map.size;
     }
 
     let allValidRatingsSum = 0;
@@ -177,7 +204,10 @@ export async function GET() {
         interviewType = "technical";
       }
 
-      const answersList = answersByMockId.get(item.mockId) || [];
+      const interviewGroup = answersByMockId.get(item.mockId);
+      const answersList = interviewGroup
+        ? interviewGroup.order.map((key) => interviewGroup.map.get(key))
+        : [];
       const validRatings = [];
 
       for (const ans of answersList) {
@@ -299,7 +329,7 @@ export async function GET() {
       {
         summary: {
           totalInterviews: interviews.length,
-          totalAnswers: rawAnswers.length,
+          totalAnswers: totalDeduplicatedAnswers,
           overallAverage,
           bestScore: bestInterviewScore,
         },

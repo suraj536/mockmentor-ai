@@ -6,6 +6,11 @@ import { and, eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
+function normalizeQuestionKey(text) {
+  if (typeof text !== "string") return "";
+  return text.trim().replace(/\s+/g, " ");
+}
+
 export async function GET(req, { params }) {
   try {
     const userEmail = await getUserEmail();
@@ -44,7 +49,27 @@ export async function GET(req, { params }) {
       )
       .orderBy(UserAnswer.id);
 
-    return NextResponse.json(result);
+    // Deduplicate in memory by normalized question key:
+    // keep the row with the highest id, but preserve FIRST-seen position
+    const firstSeenOrder = [];
+    const highestById = new Map();
+
+    for (const row of result) {
+      const normKey = normalizeQuestionKey(row.question);
+      if (!highestById.has(normKey)) {
+        firstSeenOrder.push(normKey);
+        highestById.set(normKey, row);
+      } else {
+        const existing = highestById.get(normKey);
+        if (row.id > existing.id) {
+          highestById.set(normKey, row);
+        }
+      }
+    }
+
+    const deduplicated = firstSeenOrder.map((key) => highestById.get(key));
+
+    return NextResponse.json(deduplicated);
   } catch (err) {
     console.error("Error fetching feedback:", err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

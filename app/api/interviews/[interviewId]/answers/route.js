@@ -2,11 +2,16 @@ import { NextResponse } from "next/server";
 import { getUserEmail } from "@/lib/getUserEmail";
 import { db } from "@/utils/db";
 import { MockInterview, UserAnswer } from "@/utils/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import moment from "moment";
 
 function isValidString(val, maxLength = 2000) {
   return typeof val === "string" && val.trim().length > 0 && val.length <= maxLength;
+}
+
+function normalizeQuestionKey(text) {
+  if (typeof text !== "string") return "";
+  return text.trim().replace(/\s+/g, " ");
 }
 
 export async function POST(req, { params }) {
@@ -61,6 +66,51 @@ export async function POST(req, { params }) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
 
+    // Check if an answer for this question already exists for this user and interview
+    const existingRows = await db
+      .select({
+        id: UserAnswer.id,
+        question: UserAnswer.question,
+      })
+      .from(UserAnswer)
+      .where(
+        and(
+          eq(UserAnswer.mockIdRef, interviewId),
+          eq(UserAnswer.userEmail, userEmail)
+        )
+      )
+      .orderBy(desc(UserAnswer.id));
+
+    const targetNormKey = normalizeQuestionKey(question);
+    const matchingRow = existingRows.find(
+      (row) => normalizeQuestionKey(row.question) === targetNormKey
+    );
+
+    if (matchingRow) {
+      // Update newest existing row (highest id)
+      const targetId = matchingRow.id;
+      const resp = await db
+        .update(UserAnswer)
+        .set({
+          correctAns: correctAnsStr,
+          userAns,
+          feedback: feedbackStr,
+          rating: parsedRating,
+          createdAt: moment().format("YYYY-MM-DD"),
+        })
+        .where(
+          and(
+            eq(UserAnswer.id, targetId),
+            eq(UserAnswer.mockIdRef, interviewId),
+            eq(UserAnswer.userEmail, userEmail)
+          )
+        )
+        .returning({ id: UserAnswer.id });
+
+      return NextResponse.json({ success: true, resp, id: targetId });
+    }
+
+    // Insert new answer
     const resp = await db
       .insert(UserAnswer)
       .values({
