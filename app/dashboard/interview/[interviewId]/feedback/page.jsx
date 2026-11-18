@@ -1,7 +1,20 @@
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef } from "react";
-import { ChevronDown, ArrowLeft, AlertCircle, Award, Download } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  ArrowLeft,
+  AlertCircle,
+  Award,
+  Download,
+  Sparkles,
+  LoaderCircle,
+  Copy,
+  Check,
+  RotateCcw,
+  Lightbulb,
+} from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -10,13 +23,98 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
-import { formatExperience, parseStarFeedback } from "@/lib/utils";
+import { formatExperience, parseStarFeedback, cn } from "@/lib/utils";
+
+// Fast string hash (djb2) to fingerprint full candidate answer text
+function stringHash(str) {
+  let hash = 5381;
+  const s = String(str || "");
+  for (let i = 0; i < s.length; i++) {
+    hash = ((hash << 5) + hash) + s.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return (hash >>> 0).toString(16);
+}
+
+// Untrusted sessionStorage cache reader with structural validation
+function getCachedCoaching(answerId, userAns) {
+  try {
+    if (typeof window === "undefined" || !window.sessionStorage) return null;
+    const raw = window.sessionStorage.getItem(`mockmentor_coach_${answerId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const currentHash = stringHash(userAns || "");
+    if (parsed?.ansHash !== currentHash) {
+      window.sessionStorage.removeItem(`mockmentor_coach_${answerId}`);
+      return null;
+    }
+    const data = parsed?.data;
+    if (
+      data &&
+      Array.isArray(data.tips) &&
+      data.tips.length >= 2 &&
+      data.tips.length <= 4 &&
+      data.tips.every(
+        (t) => typeof t === "string" && t.trim().length >= 10 && t.trim().length <= 350
+      ) &&
+      typeof data.improvedAnswer === "string" &&
+      data.improvedAnswer.trim().length >= 20 &&
+      data.improvedAnswer.trim().length <= 3000
+    ) {
+      return {
+        tips: data.tips.map((t) => t.trim()),
+        improvedAnswer: data.improvedAnswer.trim(),
+      };
+    }
+    window.sessionStorage.removeItem(`mockmentor_coach_${answerId}`);
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function setCachedCoaching(answerId, userAns, data) {
+  try {
+    if (typeof window === "undefined" || !window.sessionStorage) return;
+    const currentHash = stringHash(userAns || "");
+    window.sessionStorage.setItem(
+      `mockmentor_coach_${answerId}`,
+      JSON.stringify({ ansHash: currentHash, data })
+    );
+  } catch (_) {}
+}
+
+// Plain React highlighter for [bracketed placeholders] — zero dangerouslySetInnerHTML
+function renderHighlightedAnswer(text) {
+  if (typeof text !== "string") return null;
+  const parts = text.split(/(\[[^\]]+\])/g);
+  return parts.map((part, index) => {
+    if (part.startsWith("[") && part.endsWith("]")) {
+      return (
+        <span
+          key={index}
+          className="inline-block font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/15 dark:bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded text-xs sm:text-sm my-0.5"
+        >
+          {part}
+        </span>
+      );
+    }
+    return <span key={index}>{part}</span>;
+  });
+}
 
 const Feedback = ({ params }) => {
   const router = useRouter();
   const [feedbackList, setFeedbackList] = useState([]);
   const [interviewData, setInterviewData] = useState(null);
   const afterprintCleanupRef = useRef(null);
+
+  // Per-answer Coaching States
+  const [coachingData, setCoachingData] = useState({});
+  const [coachingLoading, setCoachingLoading] = useState({});
+  const [coachingErrors, setCoachingErrors] = useState({});
+  const [coachingCollapsed, setCoachingCollapsed] = useState({});
+  const [copiedAnswerId, setCopiedAnswerId] = useState(null);
 
   useEffect(() => {
     GetFeedback();
@@ -33,12 +131,51 @@ const Feedback = ({ params }) => {
     };
   }, []);
 
+  // 429 cooldown countdown timer
+  useEffect(() => {
+    const hasCooldown = Object.values(coachingErrors).some(
+      (e) => e?.is429 && e.cooldownSec > 0
+    );
+    if (!hasCooldown) return;
+
+    const timer = setInterval(() => {
+      setCoachingErrors((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const id in next) {
+          if (next[id]?.is429 && next[id].cooldownSec > 0) {
+            changed = true;
+            next[id] = {
+              ...next[id],
+              cooldownSec: next[id].cooldownSec - 1,
+            };
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [coachingErrors]);
+
   const GetFeedback = async () => {
     try {
       const res = await fetch(`/api/interviews/${params.interviewId}/feedback`);
       if (res.ok) {
         const result = await res.json();
         setFeedbackList(result);
+
+        // Populate cached coaching from sessionStorage for items matching current answer hash
+        const initialCoaching = {};
+        for (const item of result) {
+          if (item?.id && item?.userAns) {
+            const cached = getCachedCoaching(item.id, item.userAns);
+            if (cached) {
+              initialCoaching[item.id] = cached;
+            }
+          }
+        }
+        setCoachingData(initialCoaching);
       } else {
         setFeedbackList([]);
       }
@@ -60,6 +197,112 @@ const Feedback = ({ params }) => {
     } catch (err) {
       // Gracefully ignore — job details are optional for the print header
       console.error(err);
+    }
+  };
+
+  const handleCoachClick = async (item) => {
+    const answerId = item.id;
+    const userAns = item.userAns;
+
+    // Clear previous error
+    setCoachingErrors((prev) => {
+      const next = { ...prev };
+      delete next[answerId];
+      return next;
+    });
+
+    // Check cache first
+    const cached = getCachedCoaching(answerId, userAns);
+    if (cached) {
+      setCoachingData((prev) => ({ ...prev, [answerId]: cached }));
+      setCoachingCollapsed((prev) => ({ ...prev, [answerId]: false }));
+      return;
+    }
+
+    setCoachingLoading((prev) => ({ ...prev, [answerId]: true }));
+
+    try {
+      const res = await fetch("/api/coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          interviewId: params.interviewId,
+          answerId: answerId,
+        }),
+      });
+
+      if (res.status === 429) {
+        const retryAfter = res.headers.get("Retry-After");
+        const errJson = await res.json().catch(() => ({}));
+        const cooldownSec = retryAfter ? Number(retryAfter) : 60;
+        setCoachingErrors((prev) => ({
+          ...prev,
+          [answerId]: {
+            message:
+              errJson.error ||
+              "Rate limit reached. You can make up to 60 AI requests per hour.",
+            is429: true,
+            cooldownSec: isFinite(cooldownSec) ? cooldownSec : 60,
+          },
+        }));
+        return;
+      }
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        setCoachingErrors((prev) => ({
+          ...prev,
+          [answerId]: {
+            message:
+              errJson.error ||
+              "Failed to generate coaching suggestions. Please try again.",
+            is429: false,
+          },
+        }));
+        return;
+      }
+
+      const data = await res.json();
+      if (
+        data &&
+        Array.isArray(data.tips) &&
+        data.tips.length >= 2 &&
+        data.tips.length <= 4 &&
+        typeof data.improvedAnswer === "string"
+      ) {
+        const validPayload = {
+          tips: data.tips.map((t) => String(t).trim()),
+          improvedAnswer: String(data.improvedAnswer).trim(),
+        };
+        setCoachingData((prev) => ({ ...prev, [answerId]: validPayload }));
+        setCachedCoaching(answerId, userAns, validPayload);
+        setCoachingCollapsed((prev) => ({ ...prev, [answerId]: false }));
+      } else {
+        throw new Error("Invalid coaching response structure");
+      }
+    } catch (err) {
+      console.error("Coaching fetch error:", err);
+      setCoachingErrors((prev) => ({
+        ...prev,
+        [answerId]: {
+          message: "Failed to connect. Please check your connection and try again.",
+          is429: false,
+        },
+      }));
+    } finally {
+      setCoachingLoading((prev) => ({ ...prev, [answerId]: false }));
+    }
+  };
+
+  const handleCopy = async (answerId, text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedAnswerId(answerId);
+      setTimeout(() => {
+        setCopiedAnswerId((cur) => (cur === answerId ? null : cur));
+      }, 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
     }
   };
 
@@ -273,9 +516,14 @@ const Feedback = ({ params }) => {
 
             {feedbackList.map((item, index) => {
               const parsed = parseStarFeedback(item.feedback);
+              const answerCoaching = coachingData[item.id];
+              const isLoadingCoaching = !!coachingLoading[item.id];
+              const coachError = coachingErrors[item.id];
+              const isCollapsed = !!coachingCollapsed[item.id];
+
               return (
                 <Collapsible
-                  key={index}
+                  key={item.id || index}
                   className="feedback-question-card border border-border/60 rounded-xl bg-card shadow-sm overflow-hidden"
                 >
                   <CollapsibleTrigger className="p-4 sm:p-5 w-full flex items-center justify-between gap-4 text-left hover:bg-muted/40 transition-colors cursor-pointer print:cursor-default print:hover:bg-transparent">
@@ -359,6 +607,195 @@ const Feedback = ({ params }) => {
                             {item.feedback}
                           </p>
                         </>
+                      )}
+                    </div>
+
+                    {/* AI Coaching Module */}
+                    <div className="pt-2 border-t border-border/40 space-y-3">
+                      {!answerCoaching ? (
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2 print:hidden">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCoachClick(item)}
+                              disabled={
+                                isLoadingCoaching ||
+                                !item.userAns ||
+                                item.userAns.trim().length < 5 ||
+                                (coachError?.is429 && coachError?.cooldownSec > 0)
+                              }
+                              className="gap-1.5 text-xs font-medium border-indigo-500/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 hover:border-indigo-500/50"
+                            >
+                              {isLoadingCoaching ? (
+                                <>
+                                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                                  <span>Analyzing your answer...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
+                                  <span>How to improve this answer</span>
+                                </>
+                              )}
+                            </Button>
+
+                            {(!item.userAns || item.userAns.trim().length < 5) && (
+                              <span className="text-xs text-muted-foreground">
+                                No answer recorded to coach
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Screen-reader live region for loading */}
+                          {isLoadingCoaching && (
+                            <span aria-live="polite" className="sr-only">
+                              Analyzing your answer and generating coaching suggestions...
+                            </span>
+                          )}
+
+                          {/* Error Alert with Cooldown and Retry */}
+                          {coachError && (
+                            <div
+                              role="alert"
+                              aria-live="assertive"
+                              className="rounded-lg p-3 bg-destructive/10 border border-destructive/20 text-xs text-destructive flex flex-wrap items-center justify-between gap-2 print:hidden"
+                            >
+                              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                                <AlertCircle className="h-4 w-4 shrink-0" />
+                                <span>
+                                  {coachError.message}
+                                  {coachError.is429 && coachError.cooldownSec > 0
+                                    ? ` (Retry in ${coachError.cooldownSec}s)`
+                                    : ""}
+                                </span>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleCoachClick(item)}
+                                disabled={
+                                  isLoadingCoaching ||
+                                  (coachError.is429 && coachError.cooldownSec > 0)
+                                }
+                                className="h-7 px-2.5 text-xs gap-1 border-destructive/30 hover:bg-destructive/10"
+                              >
+                                <RotateCcw className="h-3 w-3" />
+                                Retry
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {/* Screen Header Controls — Hidden in print */}
+                          <div className="flex items-center justify-between print:hidden">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                              <Sparkles className="h-3 w-3" />
+                              Coaching Generated
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                setCoachingCollapsed((prev) => ({
+                                  ...prev,
+                                  [item.id]: !prev[item.id],
+                                }))
+                              }
+                              className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1"
+                            >
+                              {isCollapsed ? (
+                                <>
+                                  <ChevronDown className="h-3.5 w-3.5" />
+                                  Show Coaching
+                                </>
+                              ) : (
+                                <>
+                                  <ChevronUp className="h-3.5 w-3.5" />
+                                  Hide Coaching
+                                </>
+                              )}
+                            </Button>
+                          </div>
+
+                          {/* Coaching Panel — Forces print:block even if collapsed on screen */}
+                          <div
+                            className={cn(
+                              "rounded-xl border border-indigo-500/20 bg-indigo-500/5 dark:bg-indigo-500/10 p-4 sm:p-5 space-y-4 print:border-gray-300 print:bg-white",
+                              isCollapsed ? "hidden print:block" : "block"
+                            )}
+                          >
+                            <div className="flex items-center justify-between border-b border-indigo-500/15 pb-2.5">
+                              <div className="flex items-center gap-2">
+                                <div className="p-1 rounded-md bg-indigo-500/15 text-indigo-600 dark:text-indigo-400">
+                                  <Sparkles className="h-4 w-4" />
+                                </div>
+                                <h4 className="font-semibold text-sm text-foreground">
+                                  AI Answer Coaching
+                                </h4>
+                              </div>
+                              <span className="text-[11px] text-muted-foreground hidden sm:inline print:hidden">
+                                Based on your answer
+                              </span>
+                            </div>
+
+                            {/* Section 1: Specific Tips */}
+                            <div className="space-y-2">
+                              <span className="text-xs uppercase tracking-wider font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                                <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
+                                Key Improvements
+                              </span>
+                              <div className="grid grid-cols-1 gap-2 pt-0.5">
+                                {answerCoaching.tips.map((tip, tipIdx) => (
+                                  <div
+                                    key={tipIdx}
+                                    className="flex items-start gap-2.5 rounded-lg bg-card/80 dark:bg-card/50 border border-border/50 p-2.5 text-xs sm:text-sm text-foreground shadow-xs"
+                                  >
+                                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
+                                      {tipIdx + 1}
+                                    </span>
+                                    <p className="leading-relaxed pt-0.5">{tip}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Section 2: Polished Version */}
+                            <div className="space-y-2 pt-1 border-t border-indigo-500/15">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs uppercase tracking-wider font-semibold text-indigo-600 dark:text-indigo-400">
+                                  Stronger Version (Using Your Facts Only)
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleCopy(item.id, answerCoaching.improvedAnswer)}
+                                  className="h-7 text-xs gap-1.5 print:hidden bg-background"
+                                >
+                                  {copiedAnswerId === item.id ? (
+                                    <>
+                                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                      <span className="text-emerald-600 font-medium">Copied!</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                                      <span>Copy</span>
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                              <div className="rounded-lg p-3 sm:p-4 bg-background/80 dark:bg-background/60 border border-border/60 text-xs sm:text-sm text-foreground leading-relaxed whitespace-pre-wrap font-sans">
+                                {renderHighlightedAnswer(answerCoaching.improvedAnswer)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </CollapsibleContent>
