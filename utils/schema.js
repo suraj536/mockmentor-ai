@@ -1,4 +1,4 @@
-import { integer, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { boolean, integer, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 import { pgTable } from "drizzle-orm/pg-core";
 
 export const MockInterview = pgTable('mockInterview', {
@@ -45,4 +45,15 @@ export const Newsletter = pgTable('newsletter',{
     newEmail: varchar('newEmail'),
     newMessage: text('newMessage'),
     createdAt: timestamp('createdAt', { mode: 'string' })
-})
+});
+
+export const SharedReport = pgTable('sharedReport', {
+    id: serial('id').primaryKey(),
+    tokenHash: varchar('tokenHash', { length: 64 }).notNull().unique(),
+    mockId: varchar('mockId', { length: 255 }).notNull(),
+    createdBy: varchar('createdBy', { length: 255 }).notNull(),
+    includeAnswers: boolean('includeAnswers').default(false).notNull(),
+    expiresAt: timestamp('expiresAt', { withTimezone: true, mode: 'string' }),
+    createdAt: timestamp('createdAt', { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    revokedAt: timestamp('revokedAt', { withTimezone: true, mode: 'string' }),
+});

@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import { formatExperience, parseStarFeedback, cn } from "@/lib/utils";
+import ShareReportDialog from "./_components/ShareReportDialog";
 
 // Fast string hash (djb2) to fingerprint full candidate answer text
 function stringHash(str) {
@@ -860,6 +861,7 @@ const Feedback = ({ params }) => {
               <Download className="h-4 w-4" />
               Download PDF Report
             </Button>
+            <ShareReportDialog interviewId={params.interviewId} />
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"

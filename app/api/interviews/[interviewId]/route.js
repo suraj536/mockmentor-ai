@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUserEmail } from "@/lib/getUserEmail";
 import { db } from "@/utils/db";
-import { MockInterview, UserAnswer } from "@/utils/schema";
+import { MockInterview, UserAnswer, SharedReport } from "@/utils/schema";
 import { and, eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +64,15 @@ export async function DELETE(req, { params }) {
 
     if (!existing || existing.length === 0) {
       return NextResponse.json({ error: "Interview not found" }, { status: 404 });
+    }
+
+    // Delete associated sharedReport rows (wrapped in try/catch in case table does not exist yet)
+    try {
+      await db
+        .delete(SharedReport)
+        .where(eq(SharedReport.mockId, interviewId));
+    } catch (shareErr) {
+      console.warn("SharedReport cleanup skipped (table may not exist yet):", shareErr?.message);
     }
 
     // Delete userAnswer rows with mockIdRef = interviewId (do NOT filter by userEmail)
