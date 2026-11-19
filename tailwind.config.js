@@ -52,6 +52,16 @@ module.exports = {
           DEFAULT: "#000",
           100: '#000319'
         },
+        brand: {
+          primary: "#7657F6",
+          primaryHover: "#6443E8",
+          secondary: "#38BDF8",
+          dark: "#17152B",
+          muted: "#73738A",
+          lavender: "#F7F7FC",
+          cardLight: "#FFFFFF",
+          borderLight: "#E8E8F2",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -85,6 +95,17 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        "success-text": "hsl(var(--success-text))",
+        "warning-text": "hsl(var(--warning-text))",
+        "primary-text": "hsl(var(--primary-text))",
       },
       borderRadius: {
         lg: "var(--radius)",
