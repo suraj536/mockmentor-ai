@@ -1,9 +1,19 @@
 # 🚀 MockMentor AI — Smart Interview Practice Platform
 
 <p align="center">
- <img width="1920" height="859" alt="1" src="1.png/home/suraj-desai/Desktop" />
+<img width="1919" height="923" alt="1" src="https://github.com/user-attachments/assets/dc1daf80-d14c-4368-ae77-31ba28c0b44b" />
+ />
  <br/><br/>
-<img width="1920" height="854" alt="2" src="https://github.com/user-attachments/assets/b9b82302-1a4b-4625-af7b-d1478712adb8" />
+ <img width="1920" height="923" alt="2" src="https://github.com/user-attachments/assets/b5205a3e-9219-4746-b76d-6ce977631010" />
+  <br/><br/>
+
+<img width="1919" height="926" alt="3" src="https://github.com/user-attachments/assets/94b0a3ce-1696-4d2a-94c2-47d5577dadca" />
+  <br/><br/>
+
+  <img width="1920" height="923" alt="4" src="https://github.com/user-attachments/assets/9e570077-9c24-42bf-b2e7-80624183f5fc" />
+ <br/><br/>
+ 
+ <img width="1920" height="926" alt="5" src="https://github.com/user-attachments/assets/23ee1e6d-3c0b-4eb3-9a75-8c1cd204899a" />
 
 </p>
 
