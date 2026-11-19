@@ -9,7 +9,8 @@ export const MockInterview = pgTable('mockInterview', {
     jobExperience: varchar('jobExperience').notNull(),
     createdBy: varchar('createdBy').notNull(),
     createdAt: timestamp('createdAt', { mode: 'string' }),
-    mockId: varchar('mockId').notNull()
+    mockId: varchar('mockId').notNull().unique(),
+    userId: varchar('userId'),
 });
 
 export const Question = pgTable('question', {
@@ -29,14 +30,15 @@ export const Question = pgTable('question', {
 
 export const UserAnswer = pgTable('userAnswer',{
     id: serial('id').primaryKey(),
-    mockIdRef: varchar('mockId').notNull(),
+    mockIdRef: varchar('mockId').notNull().references(() => MockInterview.mockId),
     question: varchar('question').notNull(),
     correctAns: text('correctAns'),
     userAns: text('userAns'),
     feedback: text('feedback'),
     rating: integer('rating'),
     userEmail: varchar('userEmail'),
-    createdAt: timestamp('createdAt', { mode: 'string' })
+    createdAt: timestamp('createdAt', { mode: 'string' }),
+    userId: varchar('userId'),
 })
 
 export const Newsletter = pgTable('newsletter',{
