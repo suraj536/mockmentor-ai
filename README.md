@@ -1,4 +1,10 @@
+
 # 🚀 MockMentor AI — Smart Interview Practice Platform
+
+## 🌐 Live Demo
+
+🚀 **Try MockMentor AI:** [Open Live Application](https://mockmentor-ai-jet.vercel.app/)
+
 
 <p align="center">
 <img width="1919" height="923" alt="1" src="https://github.com/user-attachments/assets/dc1daf80-d14c-4368-ae77-31ba28c0b44b" />
